@@ -1,0 +1,80 @@
+{
+  "executive_summary": {
+    "label_A": "08/30/25 (1wk)",
+    "label_B": "08/23/25 (4wk)",
+    "highlights": [
+      "▲ Revenue/Load improved significantly; LOH up sharply; Variable/Load also increased.",
+      "Core OR improved by approximately 6.5 pts; overall loads decreased compared to the prior 4-week average."
+    ]
+  },
+  "stories_top10": [
+    {
+      "kind": "Lane",
+      "name": "MN-DUL → WI-MAD",
+      "line": "▼ Core OR worsened as loads fell significantly; operational challenges noted.",
+      "detail": "Driver: Lane MN-DUL → WI-MAD had the largest impact."
+    },
+    {
+      "kind": "Lane",
+      "name": "MN-DUL → MN-DUL",
+      "line": "▼ Core OR worsened alongside a sharp drop in loads.",
+      "detail": "Driver: Lane MN-DUL → MN-DUL affected overall performance."
+    },
+    {
+      "kind": "Lane",
+      "name": "MN-DUL → NY-ROC",
+      "line": "→ Core OR held steady, though loads were lower.",
+      "detail": "Driver: Lane MN-DUL → NY-ROC contributed modestly."
+    },
+    {
+      "kind": "Lane",
+      "name": "MN-DUL → NC-CHA",
+      "line": "→ Core OR managed to remain stable; consistent loads observed.",
+      "detail": "Driver: Lane MN-DUL → NC-CHA played a steady role."
+    },
+    {
+      "kind": "Lane",
+      "name": "WI-MAR → WI-MAR",
+      "line": "▼ Core OR worsened significantly; operational gaps noted.",
+      "detail": "Driver: Lane WI-MAR → WI-MAR showed notable variance."
+    },
+    {
+      "kind": "Lane",
+      "name": "MN-DUL → WI-MAR",
+      "line": "▼ Core OR declined despite slight increases in loads.",
+      "detail": "Driver: Lane MN-DUL → WI-MAR was underperforming."
+    },
+    {
+      "kind": "Lane",
+      "name": "MN-DUL → ME-BAN",
+      "line": "→ Core OR held steady with limited fluctuations in loads.",
+      "detail": "Driver: Lane MN-DUL → ME-BAN remained consistent."
+    },
+    {
+      "kind": "Lane",
+      "name": "TX-DAL → IN-IND",
+      "line": "→ Core OR stable; fewer loads impacted performance.",
+      "detail": "Driver: Lane TX-DAL → IN-IND has stabilized."
+    },
+    {
+      "kind": "Lane",
+      "name": "MN-DUL → MN-MIN",
+      "line": "→ Core OR held comparatively steady, minor shifts observed.",
+      "detail": "Driver: Lane MN-DUL → MN-MIN maintained equilibrium."
+    },
+    {
+      "kind": "Lane",
+      "name": "WI-MAR → WI-WAU",
+      "line": "→ Core OR improved slightly as volumes adjusted.",
+      "detail": "Driver: Lane WI-MAR → WI-WAU showed resilience."
+    }
+  ],
+  "final_overview": "Profitability improved from 08/23/25 (4wk) to 08/30/25 (1wk), driven by an uplift in Core OR and increased revenues. The significant improvements in LOH and Variable/Load were key contributors to the positive shift.",
+  "style_key": [
+    "▲ helped network profitability",
+    "▼ hurt network profitability",
+    "→ neutral",
+    "Say “Core OR improved” when OR% decreased; “worsened” when OR% increased; “held” when flat.",
+    "Mention “compared against network Core OR” only when asterisks indicate a substituted value."
+  ]
+}

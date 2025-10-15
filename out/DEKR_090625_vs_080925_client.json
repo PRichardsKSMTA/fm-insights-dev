@@ -1,0 +1,187 @@
+{
+  "title": "DEKR Performance Report \u2014 Client View",
+  "meta": {
+    "SCAC": "DEKR",
+    "A_label": "09/06/25 (4wk)",
+    "B_label": "08/09/25 (4wk)",
+    "weeks_A": 4,
+    "weeks_B": 4,
+    "rows_A": 3960,
+    "rows_B": 4097,
+    "weekly_total_A": 990.0,
+    "weekly_total_B": 1024.25,
+    "network_total_A": 3960,
+    "network_total_B": 4097,
+    "normalization_mode": "equal_period_totals",
+    "display_loads_ceil_A": false,
+    "display_loads_ceil_B": false,
+    "network_B": {
+      "raw_loads": 4097.0,
+      "RPL": 1979.3057285818893,
+      "VPL": 1246.0250866487672,
+      "OHL": 1040.4915230656577,
+      "LOH": 727.2722479863314,
+      "Core_OR": 1.1552114343409912,
+      "ProfitPerLoad": -307.2108811325354
+    },
+    "generated_at": "2025-09-09T13:39:51Z",
+    "client_code": "DEKR",
+    "report_type": "client"
+  },
+  "highlights": [],
+  "stories": [
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: CH ROBINSON \u2014 Core OR worsened to 151.8 (from 150.2) and loads increased by 79.",
+      "driver_detail": "Biggest driver within this customer: Lane OH-CIN \u2192 IL-PEO hurt the network most."
+    },
+    {
+      "arrow": "\u25b2",
+      "headline": "Inbound Area: LA-NO \u2014 Core OR moved down to 100.5 (was 115.7) with loads up 3; RPM improved by $0.27/mi.",
+      "driver_detail": "Top driver in this area: Customer TYSON FRESH MEATS helped the network most."
+    },
+    {
+      "arrow": "\u25b2",
+      "headline": "Inbound Area: GA-ATL \u2014 Core OR better at 96.3 (vs 101.9) and volume down 5 loads; RPM improved by $0.23/mi.",
+      "driver_detail": "Primary driver: Customer ROAR LOGISTICS INC helped the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: OH-FIN \u2014 Core OR worsened to 121.6 (from 100.8) and loads increased by 3; RPM worsened by $0.60/mi.",
+      "driver_detail": "Biggest driver in this area: Customer TYSON FRESH MEATS hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Outbound Area: TX-DAL \u2014 Core OR rose to 131.3 (was 125.0) with loads up 22.",
+      "driver_detail": "Top driver in this area: Customer CH ROBINSON hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: CO-DEN \u2014 Core OR higher at 113.1 (vs 108.8) and volume up 6 loads.",
+      "driver_detail": "Primary driver: Customer Sherwin-Williams - Corporate Office hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: DREYER'S GRAND ICE CREAM \u2014 Core OR worsened to 108.8 (from 101.8) and loads increased by 13.",
+      "driver_detail": "Biggest driver within this customer: Lane GA-ALB \u2192 FL-MIA hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: IN-IND \u2014 Core OR rose to 117.0 (was 110.0) with loads up 1.",
+      "driver_detail": "Top driver in this area: Customer WALMART hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: HY-VEE FOOD STORES \u2014 Core OR higher at 120.4 (vs 114.8) and volume down 83 loads; RPM worsened by $0.21/mi.",
+      "driver_detail": "Primary driver: Lane MO-KAN \u2192 IA-SIO hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: IN-FTW \u2014 Core OR worsened to 157.3 (from 121.5) and loads decreased by 1; RPM worsened by $0.28/mi.",
+      "driver_detail": "Biggest driver in this area: Customer KROGER KMA - RETAIL hurt the network most."
+    }
+  ],
+  "final_word": "From 08/09/25 (4wk) to 09/06/25 (4wk), these items drove the biggest changes. Focus on \u25b2 items for upside, mitigate \u25bc.",
+  "top10": [
+    {
+      "section": "customers",
+      "name": "CH ROBINSON",
+      "Composite": -27484.32509833718,
+      "Impact_D": -27484.32509833718,
+      "Impact_S": -38458.554311502325,
+      "Dollarized_S": -62728.21392097262,
+      "loads_A": 408.0,
+      "loads_B": 329.0
+    },
+    {
+      "section": "inbound",
+      "name": "LA-NO",
+      "Composite": 17712.06668150688,
+      "Impact_D": 25302.95240215269,
+      "Impact_S": -182.6309280309663,
+      "Dollarized_S": -1104.2635714285725,
+      "loads_A": 73.0,
+      "loads_B": 70.0
+    },
+    {
+      "section": "inbound",
+      "name": "GA-ATL",
+      "Composite": 16602.639797979868,
+      "Impact_D": 16602.639797979868,
+      "Impact_S": -1241.614001622271,
+      "Dollarized_S": 294.44040404040607,
+      "loads_A": 94.0,
+      "loads_B": 99.0
+    },
+    {
+      "section": "inbound",
+      "name": "OH-FIN",
+      "Composite": -14120.8760952381,
+      "Impact_D": -14120.8760952381,
+      "Impact_S": 862.105500540463,
+      "Dollarized_S": -59.52714285714319,
+      "loads_A": 45.0,
+      "loads_B": 42.0
+    },
+    {
+      "section": "outbound",
+      "name": "TX-DAL",
+      "Composite": -13891.150666437661,
+      "Impact_D": -13891.150666437661,
+      "Impact_S": -2677.5897700137953,
+      "Dollarized_S": -9436.229154929573,
+      "loads_A": 164.0,
+      "loads_B": 142.0
+    },
+    {
+      "section": "inbound",
+      "name": "CO-DEN",
+      "Composite": -12785.972084470945,
+      "Impact_D": -12785.972084470945,
+      "Impact_S": 636.9304776349077,
+      "Dollarized_S": -1206.3348091603048,
+      "loads_A": 137.0,
+      "loads_B": 131.0
+    },
+    {
+      "section": "customers",
+      "name": "DREYER'S GRAND ICE CREAM",
+      "Composite": -12702.438732526902,
+      "Impact_D": -12702.438732526902,
+      "Impact_S": 3449.278704722966,
+      "Dollarized_S": -544.4627499999942,
+      "loads_A": 93.0,
+      "loads_B": 80.0
+    },
+    {
+      "section": "inbound",
+      "name": "IN-IND",
+      "Composite": -12512.152801239168,
+      "Impact_D": -12512.152801239168,
+      "Impact_S": 123.57757604778999,
+      "Dollarized_S": -183.63330508474542,
+      "loads_A": 119.0,
+      "loads_B": 118.0
+    },
+    {
+      "section": "customers",
+      "name": "HY-VEE FOOD STORES",
+      "Composite": -12267.98672412137,
+      "Impact_D": -17525.69532017339,
+      "Impact_S": -8667.95055335528,
+      "Dollarized_S": 16830.55258064516,
+      "loads_A": 134.0,
+      "loads_B": 217.0
+    },
+    {
+      "section": "inbound",
+      "name": "IN-FTW",
+      "Composite": -12072.415254723357,
+      "Impact_D": -17246.307506747653,
+      "Impact_S": 104.51860604695139,
+      "Dollarized_S": 411.7294871794868,
+      "loads_A": 38.0,
+      "loads_B": 39.0
+    }
+  ]
+}

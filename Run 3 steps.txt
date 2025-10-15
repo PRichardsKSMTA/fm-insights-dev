@@ -1,0 +1,25 @@
+# STEP 1: Summarize (CSV -> summary JSON)
+python summarize.py --csv "ADSJ_20250830_OpenAIAPI.csv"
+
+# STEP 2: Narrate (summary JSON -> client/internal JSONs)
+python narrate.py --summary "work\ADSJ_08-30-25-1wk_vs_08-23-25-1wk_summary.json" --model gpt-4o-mini
+# (you can use --model gpt-5-mini if you like; temperature is left to model default)
+
+# STEP 3: Render PDFs (JSONs -> PDFs; HTML fallback if PDF libs missing)
+python render_pdfs.py --client_json "out\ADSJ_08-30-25-1wk_vs_08-23-25-1wk_client.json" --internal_json "out\ADSJ_08-30-25-1wk_vs_08-23-25-1wk_internal.json"
+
+
+--------------------------------------------
+#orchestrate all
+
+.\.venv\Scripts\activate
+python orchestrate.py --csv "DEKR_20250823_OpenAIAPI.csv" --model gpt-4o
+
+.\.venv\Scripts\activate
+python orchestrate.py --latest --model gpt-4o-mini
+
+
+other models:
+gpt-5-mini
+gpt-5
+gpt-4o

@@ -1,0 +1,187 @@
+{
+  "title": "DEKR Performance Report \u2014 Client View",
+  "meta": {
+    "SCAC": "DEKR",
+    "A_label": "08/23/25 (1wk)",
+    "B_label": "08/16/25 (1wk)",
+    "weeks_A": 1,
+    "weeks_B": 1,
+    "rows_A": 1047,
+    "rows_B": 1049,
+    "weekly_total_A": 1047.0,
+    "weekly_total_B": 1049.0,
+    "network_total_A": 1047,
+    "network_total_B": 1049,
+    "normalization_mode": "equal_period_totals",
+    "display_loads_ceil_A": false,
+    "display_loads_ceil_B": false,
+    "network_B": {
+      "raw_loads": 1049.0,
+      "RPL": 1978.6366158245946,
+      "VPL": 1238.8197140133461,
+      "OHL": 1034.590857959962,
+      "LOH": 726.4351286939942,
+      "Core_OR": 1.1489783186014006,
+      "ProfitPerLoad": -294.7739561487133
+    },
+    "generated_at": "2025-09-09T14:16:04Z",
+    "client_code": "DEKR",
+    "report_type": "client"
+  },
+  "highlights": [],
+  "stories": [
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: TYSON FRESH MEATS \u2014 Core OR worsened to 94.6 (from 91.6) and loads decreased by 9.",
+      "driver_detail": "Biggest driver within this customer: Lane NE-OMA \u2192 CO-DEN hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: CH ROBINSON \u2014 Core OR rose to 148.4 (was 140.5) with loads up 5.",
+      "driver_detail": "Top driver within this customer: Lane WA-WEN \u2192 IL-CHI hurt the network most."
+    },
+    {
+      "arrow": "\u25b2",
+      "headline": "Outbound Area: GA-ATL \u2014 Core OR better at 134.0 (vs 157.9) and volume down 3 loads; RPM improved by $0.17/mi.",
+      "driver_detail": "Primary driver: Customer CH ROBINSON helped the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Outbound Area: IA-DES \u2014 Core OR worsened to 95.7 (from 92.5) and loads decreased by 8.",
+      "driver_detail": "Biggest driver in this area: Customer TYSON FRESH MEATS hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Outbound Area: MO-KAN \u2014 Core OR rose to 111.5 (was 101.0) with loads down 14; RPM worsened by $0.43/mi.",
+      "driver_detail": "Top driver in this area: Customer HY-VEE FOOD STORES hurt the network most."
+    },
+    {
+      "arrow": "\u25b2",
+      "headline": "Inbound Area: WI-MAD \u2014 Core OR better at 83.5 (vs 136.7) and volume down 10 loads; RPM improved by $1.08/mi.",
+      "driver_detail": "Primary driver: Customer Hormel Foods helped the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: HY-VEE FOOD STORES \u2014 Core OR worsened to 126.9 (from 115.9) and loads decreased by 40; RPM worsened by $0.39/mi.",
+      "driver_detail": "Biggest driver within this customer: Lane MO-KAN \u2192 IA-SIO hurt the network most."
+    },
+    {
+      "arrow": "\u25b2",
+      "headline": "Customer: ARRIVE LOGISTICS \u2014 Core OR moved down to 153.5 (was 163.6) with volume flat; RPM improved by $0.21/mi.",
+      "driver_detail": "Top driver within this customer: Lane MO-KAN \u2192 IA-DAV helped the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: IA-SIO \u2014 Core OR higher at 129.2 (vs 114.0) and volume down 35 loads; RPM worsened by $0.39/mi.",
+      "driver_detail": "Primary driver: Customer HY-VEE FOOD STORES hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: WI-MIL \u2014 Core OR worsened to 132.0 (from 114.1) and loads increased by 2; RPM worsened by $0.17/mi.",
+      "driver_detail": "Biggest driver in this area: Customer KROGER KMA - RETAIL hurt the network most."
+    }
+  ],
+  "final_word": "From 08/16/25 (1wk) to 08/23/25 (1wk), these items drove the biggest changes. Focus on \u25b2 items for upside, mitigate \u25bc.",
+  "top10": [
+    {
+      "section": "customers",
+      "name": "TYSON FRESH MEATS",
+      "Composite": -16799.686435370797,
+      "Impact_D": -16799.686435370797,
+      "Impact_S": -4596.624338370091,
+      "Dollarized_S": -1943.658733031672,
+      "loads_A": 212.0,
+      "loads_B": 221.0
+    },
+    {
+      "section": "customers",
+      "name": "CH ROBINSON",
+      "Composite": -9692.30238095237,
+      "Impact_D": -9692.30238095237,
+      "Impact_S": -2208.7654573516716,
+      "Dollarized_S": -3682.635238095238,
+      "loads_A": 110.0,
+      "loads_B": 105.0
+    },
+    {
+      "section": "outbound",
+      "name": "GA-ATL",
+      "Composite": 9461.574590517239,
+      "Impact_D": 9461.574590517239,
+      "Impact_S": 1322.0768815538606,
+      "Dollarized_S": 2206.3987500000003,
+      "loads_A": 29.0,
+      "loads_B": 32.0
+    },
+    {
+      "section": "outbound",
+      "name": "IA-DES",
+      "Composite": -7838.283463203466,
+      "Impact_D": -7838.283463203466,
+      "Impact_S": -3447.1459349039924,
+      "Dollarized_S": -1088.954285714286,
+      "loads_A": 132.0,
+      "loads_B": 140.0
+    },
+    {
+      "section": "outbound",
+      "name": "MO-KAN",
+      "Composite": -7153.5404732761945,
+      "Impact_D": -10219.343533251707,
+      "Impact_S": -3902.299947485492,
+      "Dollarized_S": 224.53543859649426,
+      "loads_A": 43.0,
+      "loads_B": 57.0
+    },
+    {
+      "section": "inbound",
+      "name": "WI-MAD",
+      "Composite": 6012.265675213673,
+      "Impact_D": 6464.570256410254,
+      "Impact_S": 2547.606592359018,
+      "Dollarized_S": 5495.346153846151,
+      "loads_A": 3.0,
+      "loads_B": 13.0
+    },
+    {
+      "section": "customers",
+      "name": "HY-VEE FOOD STORES",
+      "Composite": -5919.446336306876,
+      "Impact_D": -8456.351909009823,
+      "Impact_S": -3023.8870595078606,
+      "Dollarized_S": 8767.071186440671,
+      "loads_A": 19.0,
+      "loads_B": 59.0
+    },
+    {
+      "section": "customers",
+      "name": "ARRIVE LOGISTICS",
+      "Composite": 5775.430000000002,
+      "Impact_D": 5775.430000000002,
+      "Impact_S": -0.0,
+      "Dollarized_S": -0.0,
+      "loads_A": 26.0,
+      "loads_B": 26.0
+    },
+    {
+      "section": "inbound",
+      "name": "IA-SIO",
+      "Composite": -5428.86848245614,
+      "Impact_D": -7755.526403508771,
+      "Impact_S": -4108.205131871637,
+      "Dollarized_S": 6208.883333333329,
+      "loads_A": 19.0,
+      "loads_B": 54.0
+    },
+    {
+      "section": "inbound",
+      "name": "WI-MIL",
+      "Composite": -5185.3764705882295,
+      "Impact_D": -5185.3764705882295,
+      "Impact_S": 150.88085347389688,
+      "Dollarized_S": -438.6670588235297,
+      "loads_A": 19.0,
+      "loads_B": 17.0
+    }
+  ]
+}

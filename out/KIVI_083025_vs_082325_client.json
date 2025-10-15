@@ -1,0 +1,187 @@
+{
+  "title": "KIVI Performance Report \u2014 Client View",
+  "meta": {
+    "SCAC": "KIVI",
+    "A_label": "08/30/25 (1wk)",
+    "B_label": "08/23/25 (4wk)",
+    "weeks_A": 1,
+    "weeks_B": 4,
+    "rows_A": 356,
+    "rows_B": 1609,
+    "weekly_total_A": 356.0,
+    "weekly_total_B": 402.25,
+    "network_total_A": 356,
+    "network_total_B": 1609,
+    "normalization_mode": "longer_period_weekly",
+    "display_loads_ceil_A": false,
+    "display_loads_ceil_B": true,
+    "network_B": {
+      "raw_loads": 1609.0,
+      "RPL": 2183.2808514605344,
+      "VPL": 1183.7788067122437,
+      "OHL": 979.0482535736483,
+      "LOH": 600.9525046612804,
+      "Core_OR": 0.9906316261781165,
+      "ProfitPerLoad": 20.453791174642447
+    },
+    "generated_at": "2025-09-09T03:22:42Z",
+    "client_code": "KIVI",
+    "report_type": "client"
+  },
+  "highlights": [],
+  "stories": [
+    {
+      "arrow": "\u25bc",
+      "headline": "Outbound Area: MN-DUL \u2014 Core OR worsened to 104.7 (from 74.7) and loads decreased by 15; RPM worsened by $1.42/mi.",
+      "driver_detail": "Biggest driver in this area: Customer LOUISIANA-PACIFIC CORPORATION hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Lane: MN-DUL \u2192 WI-MAD \u2014 Core OR baseline in 08/30/25 (1wk); 32.3 in 08/23/25 (4wk) and freight disappeared (11\u21920).",
+      "driver_detail": "Top driver on this lane: Customer VIKING FOREST PRODUCTS  LLC hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: WI-MAD \u2014 Core OR higher at 114.3 (vs 40.5) and volume down 6 loads; RPM worsened by $6.43/mi.",
+      "driver_detail": "Primary driver: Customer VIKING FOREST PRODUCTS  LLC hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: VIKING FOREST PRODUCTS  LLC \u2014 Core OR baseline in 08/30/25 (1wk); 30.3 in 08/23/25 (4wk) and freight disappeared (6\u21920).",
+      "driver_detail": "Biggest driver within this customer: Lane MN-DUL \u2192 WI-MAD hurt the network most."
+    },
+    {
+      "arrow": "\u25b2",
+      "headline": "Customer: J.F. BRENNAN CO. INC. \u2014 Core OR rose to 82.9 (was 38.2) with loads up 5; RPM improved by $0.38/mi.",
+      "driver_detail": "Top driver within this customer: Lane MN-DUL \u2192 MN-MIN helped the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: SPARTAN MAT  LLC \u2014 Core OR baseline in 08/30/25 (1wk); 36.0 in 08/23/25 (4wk) and freight disappeared (5\u21920).",
+      "driver_detail": "Primary driver: Lane MN-DUL \u2192 WI-MAD hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: MN-DUL \u2014 Core OR worsened to 111.9 (from 98.9) and loads decreased by 14; RPM worsened by $0.36/mi.",
+      "driver_detail": "Biggest driver in this area: Customer FIBRIA CELLULOSE USA hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Lane: MN-DUL \u2192 MN-DUL \u2014 Core OR rose to 106.1 (was 47.7) with loads down 8; RPM worsened by $4.13/mi.",
+      "driver_detail": "Top driver on this lane: Customer FIBRIA CELLULOSE USA hurt the network most."
+    },
+    {
+      "arrow": "\u25b2",
+      "headline": "Customer: CATERPILLAR FREIGHT PAYABLE \u2014 Core OR better at 86.3 (vs 94.7) and volume down 25 loads; RPM improved by $0.33/mi.",
+      "driver_detail": "Primary driver: Lane IL-PEO \u2192 GA-SAV helped the network most."
+    },
+    {
+      "arrow": "\u25b2",
+      "headline": "Customer: THE OKONITE COMPANY \u2014 Core OR improved to 95.0 (from 98.9) and loads increased by 4.",
+      "driver_detail": "Biggest driver within this customer: Lane CA-FRE \u2192 TX-TEM helped the network most."
+    }
+  ],
+  "final_word": "From 08/23/25 (4wk) to 08/30/25 (1wk), these items drove the biggest changes. Focus on \u25b2 items for upside, mitigate \u25bc.",
+  "top10": [
+    {
+      "section": "outbound",
+      "name": "MN-DUL",
+      "Composite": -58110.69454111188,
+      "Impact_D": -58110.69454111188,
+      "Impact_S": -7133.900437527881,
+      "Dollarized_S": -7445.820752941178,
+      "loads_A": 91.0,
+      "loads_B": 106.25
+    },
+    {
+      "section": "lanes",
+      "name": "MN-DUL \u2192 WI-MAD",
+      "Composite": -26383.308187797797,
+      "Impact_D": -16065.804148539464,
+      "Impact_S": -32131.60829707893,
+      "Dollarized_S": -32356.599999999995,
+      "loads_A": 0.0,
+      "loads_B": 11.0
+    },
+    {
+      "section": "inbound",
+      "name": "WI-MAD",
+      "Composite": -25234.880125000003,
+      "Impact_D": -29964.346944444445,
+      "Impact_S": -13159.615259650578,
+      "Dollarized_S": -13272.111111111113,
+      "loads_A": 8.0,
+      "loads_B": 13.5
+    },
+    {
+      "section": "customers",
+      "name": "VIKING FOREST PRODUCTS  LLC",
+      "Composite": -19510.728469287344,
+      "Impact_D": -10833.223152579243,
+      "Impact_S": -21666.446305158486,
+      "Dollarized_S": -21794.2825,
+      "loads_A": 0.0,
+      "loads_B": 6.25
+    },
+    {
+      "section": "customers",
+      "name": "J.F. BRENNAN CO. INC.",
+      "Composite": 10773.656144999999,
+      "Impact_D": -10705.758000000002,
+      "Impact_S": 20829.444491920447,
+      "Dollarized_S": 20926.600000000002,
+      "loads_A": 5.0,
+      "loads_B": 0.25
+    },
+    {
+      "section": "customers",
+      "name": "SPARTAN MAT  LLC",
+      "Composite": -9718.442553527035,
+      "Impact_D": -5232.580995960224,
+      "Impact_S": -10465.161991920448,
+      "Dollarized_S": -10562.3175,
+      "loads_A": 0.0,
+      "loads_B": 4.75
+    },
+    {
+      "section": "inbound",
+      "name": "MN-DUL",
+      "Composite": -9240.755620364289,
+      "Impact_D": -9240.755620364289,
+      "Impact_S": 114.07717405815038,
+      "Dollarized_S": -177.3893501805045,
+      "loads_A": 55.0,
+      "loads_B": 69.25
+    },
+    {
+      "section": "lanes",
+      "name": "MN-DUL \u2192 MN-DUL",
+      "Composite": -6142.50969647822,
+      "Impact_D": -6142.50969647822,
+      "Impact_S": -2368.208148517003,
+      "Dollarized_S": -2526.7250301204817,
+      "loads_A": 13.0,
+      "loads_B": 20.75
+    },
+    {
+      "section": "customers",
+      "name": "CATERPILLAR FREIGHT PAYABLE",
+      "Composite": 5948.408812500007,
+      "Impact_D": 8497.726875000011,
+      "Impact_S": -3218.8039706339396,
+      "Dollarized_S": -3730.1487500000007,
+      "loads_A": 25.0,
+      "loads_B": 50.0
+    },
+    {
+      "section": "customers",
+      "name": "THE OKONITE COMPANY",
+      "Composite": 5821.135165795591,
+      "Impact_D": 5821.135165795591,
+      "Impact_S": 72.1651273451663,
+      "Dollarized_S": 159.0937398373967,
+      "loads_A": 35.0,
+      "loads_B": 30.75
+    }
+  ]
+}

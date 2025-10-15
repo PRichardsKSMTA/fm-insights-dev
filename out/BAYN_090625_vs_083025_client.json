@@ -1,0 +1,187 @@
+{
+  "title": "BAYN Performance Report \u2014 Client View",
+  "meta": {
+    "SCAC": "BAYN",
+    "A_label": "09/06/25 (1wk)",
+    "B_label": "08/30/25 (4wk)",
+    "weeks_A": 1,
+    "weeks_B": 4,
+    "rows_A": 660,
+    "rows_B": 2969,
+    "weekly_total_A": 660.0,
+    "weekly_total_B": 742.25,
+    "network_total_A": 660,
+    "network_total_B": 2969,
+    "normalization_mode": "longer_period_weekly",
+    "display_loads_ceil_A": false,
+    "display_loads_ceil_B": true,
+    "network_B": {
+      "raw_loads": 2969.0,
+      "RPL": 1879.3424250589424,
+      "VPL": 1335.862775345234,
+      "OHL": 1096.273640956551,
+      "LOH": 678.6320175143146,
+      "Core_OR": 1.2941422403240352,
+      "ProfitPerLoad": -552.7939912428428
+    },
+    "generated_at": "2025-09-09T13:17:03Z",
+    "client_code": "BAYN",
+    "report_type": "client"
+  },
+  "highlights": [],
+  "stories": [
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: MARS/WRIGLEY \u2014 Core OR worsened to 138.5 (from 132.0) and loads decreased by 6.",
+      "driver_detail": "Biggest driver within this customer: Lane TX-TEM \u2192 IL-CHI hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: TX-DAL \u2014 Core OR rose to 138.6 (was 130.9) with loads down 18.",
+      "driver_detail": "Top driver in this area: Customer MARS/WRIGLEY hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: IN-IND \u2014 Core OR higher at 150.3 (vs 131.6) and volume up 4 loads.",
+      "driver_detail": "Primary driver: Customer KROGER hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: KROGER \u2014 Core OR worsened to 155.8 (from 131.0) and loads increased by 8; RPM worsened by $0.27/mi.",
+      "driver_detail": "Biggest driver within this customer: Lane OH-CLE \u2192 IN-IND hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: PA-ALN \u2014 Core OR rose to 129.2 (was 111.0) with loads up 7; RPM worsened by $0.33/mi.",
+      "driver_detail": "Top driver in this area: Customer BAY & BAY TRANSPORTATION SERVICES hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Outbound Area: IL-CHI \u2014 Core OR higher at 116.1 (vs 110.1) and volume down 31 loads.",
+      "driver_detail": "Primary driver: Customer MARS/WRIGLEY hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: IL-CHI \u2014 Core OR worsened to 145.4 (from 141.6) and loads decreased by 30.",
+      "driver_detail": "Biggest driver in this area: Customer MARS/WRIGLEY hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Outbound Area: UT-SLC \u2014 Core OR rose to 161.5 (was 144.8) with loads down 10.",
+      "driver_detail": "Top driver in this area: Customer WAL MART hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Customer: NESTLE USA \u2014 Core OR higher at 138.3 (vs 128.1) and volume down 13 loads.",
+      "driver_detail": "Primary driver: Lane WI-APP \u2192 TX-DAL hurt the network most."
+    },
+    {
+      "arrow": "\u25bc",
+      "headline": "Inbound Area: UT-SLC \u2014 Core OR worsened to 140.6 (from 132.4) and loads decreased by 10.",
+      "driver_detail": "Biggest driver in this area: Customer HORMEL FOODS hurt the network most."
+    }
+  ],
+  "final_word": "From 08/30/25 (4wk) to 09/06/25 (1wk), these items drove the biggest changes. Focus on \u25b2 items for upside, mitigate \u25bc.",
+  "top10": [
+    {
+      "section": "customers",
+      "name": "MARS/WRIGLEY",
+      "Composite": -12612.516350328422,
+      "Impact_D": -18017.880500469175,
+      "Impact_S": -180.37000464003881,
+      "Dollarized_S": 3412.7909384384393,
+      "loads_A": 160.0,
+      "loads_B": 166.5
+    },
+    {
+      "section": "inbound",
+      "name": "TX-DAL",
+      "Composite": -12465.145105994561,
+      "Impact_D": -17807.350151420804,
+      "Impact_S": 3170.4444240345792,
+      "Dollarized_S": 12982.537768595039,
+      "loads_A": 73.0,
+      "loads_B": 90.75
+    },
+    {
+      "section": "inbound",
+      "name": "IN-IND",
+      "Composite": -11711.446083333352,
+      "Impact_D": -11711.446083333352,
+      "Impact_S": 153.04363601661828,
+      "Dollarized_S": -1781.7353333333317,
+      "loads_A": 56.0,
+      "loads_B": 52.5
+    },
+    {
+      "section": "customers",
+      "name": "KROGER",
+      "Composite": -11207.089735576938,
+      "Impact_D": -11207.089735576938,
+      "Impact_S": 837.1037804751688,
+      "Dollarized_S": -3308.8511538461526,
+      "loads_A": 40.0,
+      "loads_B": 32.5
+    },
+    {
+      "section": "inbound",
+      "name": "PA-ALN",
+      "Composite": -10719.646965285554,
+      "Impact_D": -10719.646965285554,
+      "Impact_S": 1158.484840765929,
+      "Dollarized_S": -2849.2715957446817,
+      "loads_A": 19.0,
+      "loads_B": 11.75
+    },
+    {
+      "section": "outbound",
+      "name": "IL-CHI",
+      "Composite": -10113.311442844948,
+      "Impact_D": -14447.587775492784,
+      "Impact_S": -12001.55970236534,
+      "Dollarized_S": 5135.054026162786,
+      "loads_A": 141.0,
+      "loads_B": 172.0
+    },
+    {
+      "section": "inbound",
+      "name": "IL-CHI",
+      "Composite": -8762.76888739961,
+      "Impact_D": -12518.241267713729,
+      "Impact_S": 1138.3376257284135,
+      "Dollarized_S": 17722.1573630137,
+      "loads_A": 116.0,
+      "loads_B": 146.0
+    },
+    {
+      "section": "outbound",
+      "name": "UT-SLC",
+      "Composite": -8478.123756944451,
+      "Impact_D": -12111.605367063501,
+      "Impact_S": 7791.450266142997,
+      "Dollarized_S": 13319.390178571426,
+      "loads_A": 18.0,
+      "loads_B": 28.0
+    },
+    {
+      "section": "customers",
+      "name": "NESTLE USA",
+      "Composite": -8406.481343263487,
+      "Impact_D": -12009.259061804984,
+      "Impact_S": 519.260489980748,
+      "Dollarized_S": 7567.383878326994,
+      "loads_A": 53.0,
+      "loads_B": 65.75
+    },
+    {
+      "section": "inbound",
+      "name": "UT-SLC",
+      "Composite": -8295.397986501497,
+      "Impact_D": -11850.568552144998,
+      "Impact_S": 5715.720569050796,
+      "Dollarized_S": 11381.858979289935,
+      "loads_A": 32.0,
+      "loads_B": 42.25
+    }
+  ]
+}

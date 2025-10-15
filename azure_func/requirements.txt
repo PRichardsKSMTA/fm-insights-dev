@@ -1,0 +1,7 @@
+azure-functions
+pandas
+numpy
+pyodbc
+python-dotenv
+openai
+requests
