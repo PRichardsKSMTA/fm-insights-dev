@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# OpenAI Stuff
+Open AI Stuff.txt
+
 local.settings.json
 
 # Distribution / packaging
