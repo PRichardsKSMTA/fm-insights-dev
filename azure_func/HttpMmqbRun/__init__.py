@@ -133,7 +133,7 @@ def _load_dataset(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Lis
     return normalized, columns
 
 def _resolve_model() -> str:
-    model = os.environ.get(DEFAULT_MODEL_ENV, "gpt-4o-mini")
+    model = os.environ.get(DEFAULT_MODEL_ENV, "gpt-4.1")
     LOGGER.info("Model resolved", extra={"event": "model_resolved", "model": model})
     return model
 
@@ -233,30 +233,30 @@ def _complete_operation_without_data(
 ) -> None:
     message = f"Stored procedure {data_proc_name} completed. No dataset rows returned from proc."
 
-    update_proc = os.environ.get(UPDATE_STATUS_PROC_ENV, "dbo.UPDATE_CLIENT_UPLOAD_OPERATION_STATUS")
-    try:
-        _call_procedure_no_results(db, update_proc, [operation_cd, "MMQB-COMPLETE"])
-        LOGGER.info(
-            "Operation marked complete with no data",
-            extra={
-                "event": "operation_marked_complete",
-                "operation_cd": operation_cd,
-                "upload_id": upload_id,
-                "update_proc": update_proc,
-            },
-        )
-    except DatabaseError as exc:
-        log_exception(
-            LOGGER,
-            "Failed to mark operation complete after no-data result",
-            extra={
-                "event": "operation_mark_complete_failed",
-                "operation_cd": operation_cd,
-                "upload_id": upload_id,
-                "update_proc": update_proc,
-            },
-        )
-        LOGGER.error("Operation completion update failed", extra={"error": str(exc)})
+    # update_proc = os.environ.get(UPDATE_STATUS_PROC_ENV, "dbo.UPDATE_CLIENT_UPLOAD_OPERATION_STATUS")
+    # try:
+    #     _call_procedure_no_results(db, update_proc, [operation_cd, "MMQB-COMPLETE"])
+    #     LOGGER.info(
+    #         "Operation marked complete with no data",
+    #         extra={
+    #             "event": "operation_marked_complete",
+    #             "operation_cd": operation_cd,
+    #             "upload_id": upload_id,
+    #             "update_proc": update_proc,
+    #         },
+    #     )
+    # except DatabaseError as exc:
+    #     log_exception(
+    #         LOGGER,
+    #         "Failed to mark operation complete after no-data result",
+    #         extra={
+    #             "event": "operation_mark_complete_failed",
+    #             "operation_cd": operation_cd,
+    #             "upload_id": upload_id,
+    #             "update_proc": update_proc,
+    #         },
+    #     )
+    #     LOGGER.error("Operation completion update failed", extra={"error": str(exc)})
 
     flow_url = os.environ.get(
         NO_DATA_FLOW_URL_ENV,
@@ -324,6 +324,66 @@ def _fetch_prompt_text(db: DatabaseClient, proc_name: str, operation_cd: str) ->
     LOGGER.info("Prompt text fallback column used", extra={"event": "prompt_fetch_fallback", "has_value": bool(value)})
     return str(value) if value else None
 
+
+def _fetch_html_skeleton(
+    db: DatabaseClient,
+    proc_name: str,
+    operation_cd: str,
+) -> Optional[str]:
+    """
+    Call the HTML skeleton stored procedure and return the template text
+    from the MMQB_HTML_SKELETON_TEXT column (nvarchar(max)).
+
+    Returns None if no row or no template is present.
+    """
+    LOGGER.info(
+        "Fetching HTML skeleton",
+        extra={
+            "event": "html_skeleton_fetch_start",
+            "proc": proc_name,
+            "operation_cd": operation_cd,
+        },
+    )
+
+    rows = _call_procedure(db, proc_name, [operation_cd])
+    if not rows:
+        LOGGER.warning(
+            "HTML skeleton proc returned no rows",
+            extra={
+                "event": "html_skeleton_fetch_empty",
+                "proc": proc_name,
+                "operation_cd": operation_cd,
+            },
+        )
+        return None
+
+    row = rows[0]
+    value = row.get("MMQB_HTML_SKELETON_TEXT")
+    if not value:
+        LOGGER.warning(
+            "HTML skeleton column missing or empty",
+            extra={
+                "event": "html_skeleton_missing",
+                "proc": proc_name,
+                "operation_cd": operation_cd,
+                "keys": list(row.keys()),
+            },
+        )
+        return None
+
+    template = str(value)
+    LOGGER.info(
+        "HTML skeleton fetched",
+        extra={
+            "event": "html_skeleton_fetch_ok",
+            "proc": proc_name,
+            "operation_cd": operation_cd,
+            "length": len(template),
+        },
+    )
+    return template
+
+
 def main(req: func.HttpRequest) -> func.HttpResponse:
     LOGGER.info("HttpMmqbRun triggered", extra={"event": "start"})
     try:
@@ -389,20 +449,21 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         current_rows, columns = _fetch_dataset(db, data_proc, [operation_cd])
         if not current_rows:
             LOGGER.warning("No dataset rows returned from proc", extra={"event": "no_data_from_proc", **log_context})
-            _complete_operation_without_data(
-                db,
-                operation_cd=operation_cd,
-                upload_id=upload_id,
-                data_proc_name=data_proc,
-            )
+            # _complete_operation_without_data(
+            #     db,
+            #     operation_cd=operation_cd,
+            #     upload_id=upload_id,
+            #     data_proc_name=data_proc,
+            # )
             return _ensure_json_response({"error": "No data available for supplied upload."}, 404)
         LOGGER.info(
             "Dataset loaded",
             extra={"event": "dataset_loaded", "current_rows": len(current_rows), "column_count": len(columns), "columns_sample": columns[:50], **log_context},
         )
 
-        # 2) Get prompt text (optional but logged)
-        prompt_text = _fetch_prompt_text(db, procs[PROC_PROMPT_TEXT], operation_cd)
+        # 2) Get prompt text and html template (optional but logged)
+        prompt_text = _fetch_prompt_text(db, procs["prompt_text"], operation_cd)
+        html_template = _fetch_html_skeleton(db, procs["html_skeleton"], operation_cd)
 
         # 3) Summarize (A/B derived from the single dataset)
         LOGGER.info("Summarization start", extra={"event": "summarize_start", **log_context})
@@ -418,13 +479,19 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         client_doc = _sanitize_client_doc(client_doc)
         LOGGER.info(
             "Narration done",
-            extra={"event": "narration_done", "client_len": len(json.dumps(client_doc)), "internal_len": len(json.dumps(internal_doc)), **log_context},
+            extra={
+                "event": "narration_done",
+                "client_len": len(json.dumps(client_doc)),
+                "internal_len": len(json.dumps(internal_doc)),
+                **log_context,
+            },
         )
-
+        
         # 5) Save
         internal_json = json.dumps(internal_doc)
         client_json = json.dumps(client_doc)
-        client_html = render_client(copy.deepcopy(client_doc))
+
+        client_html = render_client(copy.deepcopy(client_doc), template=html_template)
         internal_html = render_internal(copy.deepcopy(internal_doc))
         LOGGER.info(
             "HTML rendered",

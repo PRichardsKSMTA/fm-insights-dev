@@ -15,8 +15,8 @@ Fixes included:
 - Child process outputs are parsed to extract produced paths, with fallbacks to newest files.
 
 Usage examples:
-  python orchestrate.py --latest --model gpt-4o-mini
-  python orchestrate.py --csv "in\\KIVI_20250830_OpenAIAPI.csv" --model gpt-4o-mini
+  python orchestrate.py --latest --model gpt-4.1
+  python orchestrate.py --csv "in\\KIVI_20250830_OpenAIAPI.csv" --model gpt-4.1
 """
 
 import argparse
@@ -164,7 +164,7 @@ def main():
     ap = argparse.ArgumentParser(description="Run summarize -> narrate -> render pipeline.")
     ap.add_argument("--csv", help="Path or filename of the CSV (we will also look in ./in/).")
     ap.add_argument("--latest", action="store_true", help="Use the latest CSV in ./in/")
-    ap.add_argument("--model", default="gpt-4o-mini", help="Model for narrate.py")
+    ap.add_argument("--model", default="gpt-4.1", help="Model for narrate.py")
     args = ap.parse_args()
 
     # Resolve CSV

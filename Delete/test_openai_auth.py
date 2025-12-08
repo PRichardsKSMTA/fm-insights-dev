@@ -22,7 +22,7 @@ try:
     print("OK: model list retrieved (showing first 10):")
     for mid in ids[:10]:
         print(" •", mid)
-    print("\nCheck that 'gpt-4o-mini' appears above.")
+    print("\nCheck that 'gpt-4.1' appears above.")
 except Exception as e:
     print("ERROR talking to API:")
     print(repr(e))

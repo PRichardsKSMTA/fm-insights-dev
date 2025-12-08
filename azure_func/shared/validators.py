@@ -42,6 +42,7 @@ def ensure_stored_procedure_env() -> Dict[str, str]:
     required_envs = {
         "data_current": "MMQB_PROC_DATA_CURRENT",
         "prompt_text": "MMQB_PROC_PROMPT_TEXT",
+        "html_skeleton": "MMQB_PROC_HTML_SKELETON",  # NEW
         "save": "MMQB_SAVE_PROC",
     }
 

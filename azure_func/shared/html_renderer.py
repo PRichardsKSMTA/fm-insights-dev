@@ -177,6 +177,140 @@ def _html_header(title: str) -> str:
 def _html_footer() -> str:
     return "</body></html>"
 
+def _render_client_with_template(doc: Dict[str, Any], template: str) -> str:
+    """
+    Render a client-facing document using an HTML skeleton pulled from the DB.
+
+    The template supports simple Mustache-style placeholders:
+
+      Global (single value):
+        {{CLIENT_CODE}}
+        {{TITLE}}
+        {{LABEL_A}}
+        {{LABEL_B}}
+        {{COMPARISON_LABEL}}
+        {{LOW_VOLUME_NOTE}}
+        {{FINAL_WORD}}
+
+      Repeating sections:
+        {{#HIGHLIGHTS}}...{{/HIGHLIGHTS}}
+          Inside the block: {{HIGHLIGHT}}
+
+        {{#STORIES}}...{{/STORIES}}
+          Inside the block:
+            {{INDEX}}          1..10
+            {{ARROW}}          e.g. ▲, ▼, →
+            {{ARROW_WORD}}     "up" | "down" | "flat"
+            {{ENTITY_LABEL}}   "Inbound Area: IN-IND"
+            {{HEADLINE}}       headline text without entity label
+            {{HEADLINE_FULL}}  full headline text
+            {{DRIVER_DETAIL}}  driver detail line
+
+    Everything substituted is HTML-escaped.
+    """
+
+    meta = doc.get("meta", {}) or {}
+    title = str(doc.get("title", "Client Report"))
+    client_code = str(meta.get("client_code") or meta.get("SCAC") or "CLIENT")
+
+    # Period labels and comparison
+    weeks_a, weeks_b = _infer_weeks(meta)
+    label_a = str(meta.get("A_label") or meta.get("period_A_label") or "")
+    label_b = str(meta.get("B_label") or meta.get("period_B_label") or "")
+    comparison_label = ""
+    if weeks_a and weeks_b:
+        comparison_label = f"{_plural(weeks_a, 'week')} vs {_plural(weeks_b, 'week')}"
+
+    low_volume_note = _filter_basis_note(meta)
+
+    highlights = [h for h in doc.get("highlights", []) if isinstance(h, str)]
+    stories = [s for s in doc.get("stories", []) if isinstance(s, dict)]
+
+    def _split_headline(raw: str) -> Tuple[str, str]:
+        """Split 'Entity — rest' into (entity, rest)."""
+        text = raw.strip()
+        parts = text.split(" — ", 1)
+        if len(parts) == 2:
+            return parts[0].strip(), parts[1].strip()
+        return text, text
+
+    def _arrow_word(ch: str) -> str:
+        ch = (ch or "").strip()
+        if ch in ("▲", "△", "↑"):
+            return "up"
+        if ch in ("▼", "▽", "↓"):
+            return "down"
+        return "flat"
+
+    def _render_section(section: str, items: List[Dict[str, str]], text: str) -> str:
+        """Very small Mustache-like repeater for {{#SECTION}}...{{/SECTION}}."""
+        start_tag = "{{#" + section + "}}"
+        end_tag = "{{/" + section + "}}"
+        start = text.find(start_tag)
+        end = text.find(end_tag)
+        if start == -1 or end == -1 or end <= start:
+            return text
+
+        before = text[:start]
+        block = text[start + len(start_tag) : end]
+        after = text[end + len(end_tag) :]
+
+        rendered_blocks: List[str] = []
+        for item in items:
+            block_text = block
+            for key, value in item.items():
+                block_text = block_text.replace("{{" + key + "}}", value)
+            rendered_blocks.append(block_text)
+
+        return before + "".join(rendered_blocks) + after
+
+    # Build items for HIGHLIGHTS
+    highlight_items: List[Dict[str, str]] = [
+        {"HIGHLIGHT": escape(h)} for h in highlights
+    ]
+
+    # Build items for STORIES
+    story_items: List[Dict[str, str]] = []
+    for index, story in enumerate(stories, 1):
+        raw_headline = str(story.get("headline", "")).strip()
+        entity_label, headline_body = _split_headline(raw_headline)
+        arrow = str(story.get("arrow", "")).strip()
+        driver_detail = str(story.get("driver_detail", "")).strip()
+        story_items.append(
+            {
+                "INDEX": str(index),
+                "ARROW": escape(arrow),
+                "ARROW_WORD": escape(_arrow_word(arrow)),
+                "ENTITY_LABEL": escape(entity_label),
+                "HEADLINE": escape(headline_body),
+                "HEADLINE_FULL": escape(raw_headline),
+                "DRIVER_DETAIL": escape(driver_detail),
+            }
+        )
+
+    # Apply section expansions
+    rendered = template
+    rendered = _render_section("STORIES", story_items, rendered)
+    rendered = _render_section("HIGHLIGHTS", highlight_items, rendered)
+
+    # Single-value placeholders
+    final_word = escape(str(doc.get("final_word", "")).strip())
+
+    replacements = {
+        "CLIENT_CODE": escape(client_code),
+        "TITLE": escape(title),
+        "LABEL_A": escape(label_a),
+        "LABEL_B": escape(label_b),
+        "COMPARISON_LABEL": escape(comparison_label),
+        "LOW_VOLUME_NOTE": escape(low_volume_note),
+        "FINAL_WORD": final_word,
+    }
+
+    for key, value in replacements.items():
+        rendered = rendered.replace("{{" + key + "}}", value)
+
+    return rendered
+
 
 def _render_client(doc: Dict[str, Any]) -> str:
     meta = doc.get("meta", {}) or {}
@@ -389,10 +523,16 @@ def _copy_doc(doc: Dict[str, Any] | None) -> Dict[str, Any]:
     return copy.deepcopy(doc or {})
 
 
-def render_client(doc: Dict[str, Any]) -> str:
-    """Render a client-facing document to HTML without mutating the source."""
+def render_client(doc: Dict[str, Any], template: str | None = None) -> str:
+    """Render a client-facing document to HTML without mutating the source.
 
-    return _render_client(_copy_doc(doc))
+    If *template* is provided, it should be a full HTML skeleton string with
+    Mustache-style placeholders supported by _render_client_with_template.
+    """
+    copied = _copy_doc(doc)
+    if template:
+        return _render_client_with_template(copied, template)
+    return _render_client(copied)
 
 
 def render_internal(doc: Dict[str, Any]) -> str:

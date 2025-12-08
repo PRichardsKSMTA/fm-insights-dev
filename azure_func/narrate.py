@@ -18,8 +18,18 @@ Key behaviors:
 import argparse
 import json
 import os
+import re
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+from openai import OpenAI, RateLimitError, APIError
+
+try:
+    from azure.storage.blob import BlobServiceClient, ContentSettings
+except Exception:  # pragma: no cover - optional dependency
+    BlobServiceClient = None  # type: ignore
+    ContentSettings = None # type: ignore
 
 OUT_DIR = "out"
 PROMPT_PATH = os.path.join("prompts", "report_system.md")
@@ -56,6 +66,12 @@ except Exception:  # pragma: no cover - import/runtime guard
     _OPENAI = None
 
 OPENAI_ERRORS = (BadRequestError, RateLimitError, APIError)
+LOG_BLOB_CONN_ENV = "MMQB_LOG_BLOB_STORAGE"
+LOG_CONTAINER_NAME = "fm-insights-logs"
+
+_BLOB_SERVICE_CLIENT: Optional["BlobServiceClient"] = None # type: ignore
+_BLOB_INIT_FAILED = False
+
 
 def _safe_float(x: Any, default: float = 0.0) -> float:
     try:
@@ -81,7 +97,7 @@ def log(s: str) -> None:
     print(s, flush=True)
 
 
-def _get_openai_client() -> Optional["OpenAI"]:
+def _get_openai_client() -> Optional["OpenAI"]: # type: ignore
     global _OPENAI  # pylint: disable=global-statement
     if _OPENAI is not None:
         return _OPENAI
@@ -112,95 +128,291 @@ def resolve_summary_path(p: str) -> str:
     raise FileNotFoundError(f"Summary not found: {p} (also tried {candidate})")
 
 
+def _label_to_yyyymmdd(label: Optional[str]) -> str:
+    """
+    Convert a label like '11/15/25 (1wk)' into '20251115'.
+    Falls back to stripping non-digits if it can't parse.
+    """
+    if not label:
+        return "00000000"
+
+    token = str(label).strip().split()[0]  # e.g. '11/15/25'
+
+    # Try common formats explicitly.
+    for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%m/%d/%y"):
+        try:
+            dt = datetime.strptime(token, fmt)
+            return dt.strftime("%Y%m%d")
+        except Exception:
+            continue
+
+    # Fallback: keep only digits and interpret mmddyy if length==6
+    digits = re.sub(r"\D", "", token)
+    if len(digits) == 8:
+        return digits
+    if len(digits) == 6:
+        try:
+            mm = int(digits[0:2])
+            dd = int(digits[2:4])
+            yy = int(digits[4:6])
+            year = 2000 + yy if yy < 50 else 1900 + yy
+            dt = datetime(year, mm, dd)
+            return dt.strftime("%Y%m%d")
+        except Exception:
+            return digits
+    return (digits + "00000000")[:8] if digits else "00000000"
+
+
+def _derive_log_identity(meta: Dict[str, Any]) -> Tuple[str, str, str, str, str]:
+    """
+    Return (operation_cd, label_A, label_B, A_YYYYMMDD, B_YYYYMMDD) for logging.
+    """
+    op = (
+        str(
+            meta.get("operation_cd")
+            or meta.get("client_code")
+            or meta.get("SCAC")
+            or "CLIENT"
+        )
+        .strip()
+        or "CLIENT"
+    )
+
+    label_a = _period_label(meta, "A")  # uses your existing helper
+    label_b = _period_label(meta, "B")
+
+    a_ymd = _label_to_yyyymmdd(label_a)
+    b_ymd = _label_to_yyyymmdd(label_b)
+
+    return op, (label_a or ""), (label_b or ""), a_ymd, b_ymd
+
+
+def _get_log_blob_client() -> Optional["BlobServiceClient"]: # type: ignore
+    """
+    Lazily construct a BlobServiceClient from MMQB_LOG_BLOB_STORAGE.
+    Never raises; on failure, it disables blob logging for the process lifetime.
+    """
+    global _BLOB_SERVICE_CLIENT  # type: ignore[global-variable-not-assigned]
+    global _BLOB_INIT_FAILED
+
+    if _BLOB_INIT_FAILED:
+        return None
+    if _BLOB_SERVICE_CLIENT is not None:
+        return _BLOB_SERVICE_CLIENT
+
+    if BlobServiceClient is None:
+        _BLOB_INIT_FAILED = True
+        try:
+            log(json.dumps({"event": "log_blob_unavailable", "reason": "azure.storage.blob not installed"}))
+        except Exception:
+            log("[log_blob] azure.storage.blob not installed")
+        return None
+
+    conn_str = os.environ.get(LOG_BLOB_CONN_ENV)
+    if not conn_str:
+        _BLOB_INIT_FAILED = True
+        try:
+            log(json.dumps({"event": "log_blob_unavailable", "reason": f"{LOG_BLOB_CONN_ENV} not set"}))
+        except Exception:
+            log(f"[log_blob] {LOG_BLOB_CONN_ENV} not set")
+        return None
+
+    try:
+        _BLOB_SERVICE_CLIENT = BlobServiceClient.from_connection_string(conn_str)
+        return _BLOB_SERVICE_CLIENT
+    except Exception as exc:
+        _BLOB_INIT_FAILED = True
+        try:
+            log(json.dumps({"event": "log_blob_init_error", "error": str(exc)}))
+        except Exception:
+            log(f"[log_blob] init error: {exc}")
+        return None
+
+
+def _write_log_blob(
+    kind: str,
+    operation_cd: str,
+    a_ymd: str,
+    b_ymd: str,
+    timestamp: str,
+    payload: Dict[str, Any],
+) -> None:
+    """
+    Persist a JSON payload to Azure Blob Storage.
+
+    kind: 'requests' or 'responses'
+    """
+    client = _get_log_blob_client()
+    if client is None:
+        return
+
+    try:
+        container = client.get_container_client(LOG_CONTAINER_NAME)
+        try:
+            container.create_container()
+        except Exception:
+            # Container already exists or cannot be created; best-effort only.
+            pass
+
+        blob_name = f"{kind}/{operation_cd}/{a_ymd}_vs_{b_ymd}_{operation_cd}_{kind}_{timestamp}.json"
+        data = json.dumps(payload, indent=2, default=str).encode("utf-8")
+
+        if ContentSettings is not None:
+            content_settings = ContentSettings(content_type="application/json")
+            container.upload_blob(
+                name=blob_name,
+                data=data,
+                overwrite=True,
+                content_settings=content_settings,
+            )
+        else:
+            container.upload_blob(
+                name=blob_name,
+                data=data,
+                overwrite=True,
+            )
+    except Exception as exc:
+        # Blob logging must never break the main pipeline.
+        try:
+            log(json.dumps({"event": "log_blob_write_error", "kind": kind, "error": str(exc)}))
+        except Exception:
+            log(f"[log_blob] write error ({kind}): {exc}")
+
+
 def _call_chat_completion(
     model: str,
     messages: List[Dict[str, str]],
     *,
     purpose: str,
+    log_meta: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
+    """
+    ChatCompletion call that retrieves rule text from vector store
+    using client.vector_stores.search (Assistants File Search backend),
+    injects retrieved rules into the system prompt, and returns JSON.
+    Compatible with openai==2.9.0.
+    """
+
     client = _get_openai_client()
     if client is None:
         return None
 
-    try:
-        log(json.dumps({"event": "openai_call_start", "purpose": purpose}))
-    except Exception:
-        log(f"[openai] start {purpose}")
+    meta = log_meta or {}
+    operation_cd, label_a, label_b, a_ymd, b_ymd = _derive_log_identity(meta)
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
 
-    try:
-        resp = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            response_format={"type": "json_object"},
-            temperature=0.2,
+    # ---------------------------
+    # VECTOR STORE RETRIEVAL
+    # ---------------------------
+    vector_store_id = os.environ.get("OPENAI_VECTOR_STORE_ID")
+    retrieved_rules_text = ""
+
+    if vector_store_id:
+        try:
+            results = client.vector_stores.search(
+                vector_store_id=vector_store_id,
+                query="MMQB numeric rules, core OR rules, freight narrative rules",
+                max_num_results=10,
+            )
+
+            chunks = []
+            for result in results.data:
+                for item in result.content:
+                    if hasattr(item, "text"):
+                        chunks.append(item.text)
+                    elif isinstance(item, dict) and "text" in item:
+                        chunks.append(item["text"])
+
+            retrieved_rules_text = "\n\n".join(chunks)
+
+        except Exception as exc:
+            log(f"[vector_store] retrieval error: {exc}")
+
+    # ---------------------------
+    # FINAL SYSTEM MESSAGE
+    # ---------------------------
+    base_system_prompt = messages[0]["content"]
+
+    if retrieved_rules_text:
+        system_message = (
+            "THE FOLLOWING RULES MUST BE OBEYED:\n\n"
+            + retrieved_rules_text
+            + "\n\n"
+            + "END OF RULES.\n\n"
+            + base_system_prompt
         )
-    except OPENAI_ERRORS as exc:  # pragma: no cover - requires live API
-        try:
-            log(
-                json.dumps(
-                    {
-                        "event": "openai_call_error",
-                        "purpose": purpose,
-                        "error": str(exc),
-                        "type": exc.__class__.__name__,
-                    }
-                )
-            )
-        except Exception:
-            log(f"[openai] error {purpose}: {exc}")
-        return None
-    except Exception as exc:  # pragma: no cover - network/runtime specific
-        try:
-            log(
-                json.dumps(
-                    {
-                        "event": "openai_call_error",
-                        "purpose": purpose,
-                        "error": str(exc),
-                        "type": exc.__class__.__name__,
-                    }
-                )
-            )
-        except Exception:
-            log(f"[openai] error {purpose}: {exc}")
+    else:
+        system_message = base_system_prompt
+
+    final_messages = [
+        {"role": "system", "content": system_message},
+        messages[1],
+    ]
+
+    # ---------------------------
+    # BUILD REQUEST BODY
+    # ---------------------------
+    request_body = {
+        "model": model,
+        "messages": final_messages,
+        "response_format": {"type": "json_object"},
+        "temperature": 0.2,
+    }
+
+    # Log request
+    _write_log_blob(
+        "requests",
+        operation_cd,
+        a_ymd,
+        b_ymd,
+        timestamp,
+        {"event": "openai_request", "request": request_body},
+    )
+
+    # ---------------------------
+    # CALL OPENAI
+    # ---------------------------
+    try:
+        resp = client.chat.completions.create(**request_body)
+    except Exception as exc:
+        _write_log_blob(
+            "responses",
+            operation_cd,
+            a_ymd,
+            b_ymd,
+            timestamp,
+            {"event": "openai_call_error", "error": str(exc)},
+        )
         return None
 
+    # ---------------------------
+    # EXTRACT RAW CONTENT
+    # ---------------------------
     content = ""
-    if resp.choices:
+    if resp.choices and resp.choices[0].message:
         content = (resp.choices[0].message.content or "").strip()
 
-    try:
-        log(
-            json.dumps(
-                {
-                    "event": "openai_call_end",
-                    "purpose": purpose,
-                    "finish_reason": resp.choices[0].finish_reason if resp.choices else None,
-                }
-            )
-        )
-    except Exception:
-        log(f"[openai] end {purpose}")
+    _write_log_blob(
+        "responses",
+        operation_cd,
+        a_ymd,
+        b_ymd,
+        timestamp,
+        {"event": "openai_response", "raw_content": content},
+    )
 
     if not content:
         return None
 
+    # ---------------------------
+    # PARSE JSON
+    # ---------------------------
     try:
         return json.loads(content)
-    except json.JSONDecodeError as exc:
-        try:
-            log(
-                json.dumps(
-                    {
-                        "event": "openai_parse_error",
-                        "purpose": purpose,
-                        "error": str(exc),
-                    }
-                )
-            )
-        except Exception:
-            log(f"[openai] parse error {purpose}: {exc}")
+    except Exception as exc:
+        log(f"[openai] parse error: {exc}")
         return None
+
 
 def load_json(path: str) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
@@ -328,15 +540,17 @@ def build_client_payload(
     model: str,
     system_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
+
     meta = summary.get("meta", {})
     top10 = summary.get("top10", [])
     tables = summary.get("tables", {})
 
-    items: List[Dict[str, Any]] = []
+    items = []
     for t in top10:
         section = t.get("section")
         name = t.get("name")
-        src_rows = (tables or {}).get(section, [])
+
+        src_rows = tables.get(section, [])
         src = next((r for r in src_rows if str(r.get("name","")).strip()==str(name).strip()), {})
 
         loads_A = _safe_float(src.get("loads_A", t.get("loads_A")))
@@ -344,40 +558,58 @@ def build_client_payload(
         zero_A = loads_A <= 1e-6
         zero_B = loads_B <= 1e-6
 
-        core_a  = _safe_float(src.get("Core_OR_A"))
-        core_b  = _safe_float(src.get("Core_OR_B"))
-        rpl_a   = src.get("Revenue_per_Load_A"); rpl_b = src.get("Revenue_per_Load_B")
-        loh_a   = src.get("LOH_A"); loh_b = src.get("LOH_B")
+        core_a = _safe_float(src.get("Core_OR_A"))
+        core_b = _safe_float(src.get("Core_OR_B"))
+
+        rpl_a = src.get("Revenue_per_Load_A")
+        rpl_b = src.get("Revenue_per_Load_B")
+        loh_a = src.get("LOH_A")
+        loh_b = src.get("LOH_B")
 
         rpm_a = _rpm_from_metrics(rpl_a, loh_a)
         rpm_b = _rpm_from_metrics(rpl_b, loh_b)
         rpm_big, rpm_delta, rpm_pct = _rpm_flag(rpm_a, rpm_b)
 
-        subA = bool(src.get("Core_OR_A_is_substituted", False)) or zero_A
-        subB = bool(src.get("Core_OR_B_is_substituted", False)) or zero_B
-        # Never mention RPM if substitution occurred
+        subA = bool(src.get("Core_OR_A_is_substituted")) or zero_A
+        subB = bool(src.get("Core_OR_B_is_substituted")) or zero_B
+
         rpm_big = rpm_big and not (subA or subB)
 
-        driver_line = select_primary_driver(section, name, tables)
+        driver_hint = select_primary_driver(section, name, tables)
         comp = _safe_float(t.get("Composite", 0.0))
         arrow = "▲" if comp > 0 else ("▼" if comp < 0 else "→")
 
         items.append({
-            "section": section, "name": name, "arrow": arrow,
-            "loads_A": loads_A, "loads_B": loads_B,
-            "zero_A": zero_A, "zero_B": zero_B,
-            "Core_OR_A": core_a, "Core_OR_B": core_b,
-            "Core_OR_A_pct": core_a * 100.0, "Core_OR_B_pct": core_b * 100.0,
-            "Composite": comp, "Impact_D": t.get("Impact_D"), "Impact_S": t.get("Impact_S"),
-            "driver_hint": driver_line,
-            "Core_OR_A_is_substituted": subA, "Core_OR_B_is_substituted": subB,
-            "rpm_A": rpm_a, "rpm_B": rpm_b,
-            "rpm_delta": rpm_delta, "rpm_pct": rpm_pct,
+            "section": section,
+            "name": name,
+            "arrow": arrow,
+            "loads_A": loads_A,
+            "loads_B": loads_B,
+            "zero_A": zero_A,
+            "zero_B": zero_B,
+            "Core_OR_A": core_a,
+            "Core_OR_B": core_b,
+            "Core_OR_A_pct": core_a * 100 if core_a is not None else None,
+            "Core_OR_B_pct": core_b * 100 if core_b is not None else None,
+            "Composite": comp,
+            "Impact_D": t.get("Impact_D"),
+            "Impact_S": t.get("Impact_S"),
+            "driver_hint": driver_hint,
+            "Core_OR_A_is_substituted": subA,
+            "Core_OR_B_is_substituted": subB,
+            "rpm_A": rpm_a,
+            "rpm_B": rpm_b,
+            "rpm_delta": rpm_delta,
+            "rpm_pct": rpm_pct,
             "rpm_is_big_factor": bool(rpm_big),
         })
 
+    labels = {
+        "A": _period_label(meta, "A"),
+        "B": _period_label(meta, "B"),
+    }
+
     sys_prompt = system_prompt or read_prompt_text(PROMPT_PATH)
-    labels = {"A": _period_label(meta, "A"), "B": _period_label(meta, "B")}
 
     user_payload = {
         "schema": {
@@ -389,13 +621,15 @@ def build_client_payload(
                     "items": {
                         "type": "object",
                         "properties": {
-                            "arrow": {"type": "string"},
-                            "headline": {"type": "string"},
-                            "driver_detail": {"type": "string"},
+                            "arrow": { "type": "string" },
+                            "headline": { "type": "string" },
+                            "driver_detail": { "type": "string" }
                         },
-                        "required": ["arrow", "headline", "driver_detail"],
+                        "required": ["arrow", "headline", "driver_detail"]
                     },
-                },
+                    "minItems": 10,
+                    "maxItems": 10
+                    },
                 "final_word": {"type": "string"},
             },
             "required": ["stories", "final_word"],
@@ -406,135 +640,30 @@ def build_client_payload(
         },
     }
 
+    # -------------------------------
+    # LLM CALL
+    # -------------------------------
     data = _call_chat_completion(
         model,
         [
             {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": json.dumps(user_payload, indent=2)},
+            {"role": "user",   "content": json.dumps(user_payload, indent=2)},
         ],
         purpose="client_report",
+        log_meta=meta,
     )
-    if isinstance(data, dict) and "stories" in data:
-        return {
-            "highlights": data.get("highlights", []),
-            "stories": data["stories"],
-            "final_word": data.get("final_word", ""),
-        }
 
-    # Fallback: varied, deterministic phrasing with substitution-aware logic
-    A = labels["A"]
-    B = labels["B"]
-    stories: List[Dict[str, Any]] = []
-    i = 0
-    for it in items:
-        arrow = it["arrow"]
-        sec = it["section"]; nm = it["name"] or ""
-        la = int(round(_safe_float(it.get("loads_A", 0))))
-        lb = int(round(_safe_float(it.get("loads_B", 0))))
-        dL = la - lb
-        coreA_pct = _safe_float(it.get("Core_OR_A_pct"))
-        coreB_pct = _safe_float(it.get("Core_OR_B_pct"))
-        subA = bool(it.get("Core_OR_A_is_substituted"))
-        subB = bool(it.get("Core_OR_B_is_substituted"))
-        zeroA = bool(it.get("zero_A")); zeroB = bool(it.get("zero_B"))
-        rpm_a = _safe_float(it.get("rpm_A")); rpm_b = _safe_float(it.get("rpm_B"))
-        rpm_big = bool(it.get("rpm_is_big_factor"))
+    if not isinstance(data, dict):
+        raise RuntimeError("LLM returned invalid structure.")
 
-        # Entity label
-        if sec == "lanes":
-            ent = f"Lane: {nm}"
-        elif sec == "inbound":
-            ent = f"Inbound Area: {nm}"
-        elif sec == "outbound":
-            ent = f"Outbound Area: {nm}"
-        else:
-            ent = f"Customer: {nm}"
+    if "stories" not in data or not isinstance(data.get("stories"), list):
+        raise RuntimeError("LLM did not return a valid 'stories' list.")
 
-        # Core OR text with baseline phrasing when substituted
-        if subA and subB:
-            core_txt = "Core OR at network baseline in both periods"
-        elif subB and not subA:
-            core_txt = f"Core OR {coreA_pct:.1f} vs baseline in {B}"
-        elif subA and not subB:
-            core_txt = f"Core OR baseline in {A}; {coreB_pct:.1f} in {B}"
-        else:
-            core_improved = [
-                "Core OR improved to {A:.1f} (from {B:.1f})",
-                "Core OR moved down to {A:.1f} (was {B:.1f})",
-                "Core OR better at {A:.1f} (vs {B:.1f})",
-            ]
-            core_worsened = [
-                "Core OR worsened to {A:.1f} (from {B:.1f})",
-                "Core OR rose to {A:.1f} (was {B:.1f})",
-                "Core OR higher at {A:.1f} (vs {B:.1f})",
-            ]
-            core_steady = [
-                "Core OR held near {A:.1f} (from {B:.1f})",
-                "Core OR steady at {A:.1f} (vs {B:.1f})",
-                "Core OR about {A:.1f} (from {B:.1f})",
-            ]
-            if coreA_pct < coreB_pct - 0.1:
-                core_txt = core_improved[i % len(core_improved)].format(A=coreA_pct, B=coreB_pct)
-            elif coreA_pct > coreB_pct + 0.1:
-                core_txt = core_worsened[i % len(core_worsened)].format(A=coreA_pct, B=coreB_pct)
-            else:
-                core_txt = core_steady[i % len(core_steady)].format(A=coreA_pct, B=coreB_pct)
-
-        # Loads phrase with appear/disappear
-        if zeroB and not zeroA:
-            loads_txt = f"and freight appeared (0→{la})"
-        elif zeroA and not zeroB:
-            loads_txt = f"and freight disappeared ({lb}→0)"
-        else:
-            if dL >= 1:
-                loads_opts = [f"and loads increased by {dL}", f"with loads up {dL}", f"and volume up {dL} loads"]
-                loads_txt = loads_opts[i % len(loads_opts)]
-            elif dL <= -1:
-                loads_opts = [f"and loads decreased by {abs(dL)}", f"with loads down {abs(dL)}", f"and volume down {abs(dL)} loads"]
-                loads_txt = loads_opts[i % len(loads_opts)]
-            else:
-                loads_opts = ["and loads held steady", "with volume flat", "and little change in loads"]
-                loads_txt = loads_opts[i % len(loads_opts)]
-
-        # Optional RPM clause (never if substitution happened)
-        rpm_txt = ""
-        if rpm_big and not (subA or subB):
-            if rpm_a > rpm_b:
-                rpm_txt = f"; RPM improved by ${abs(rpm_a - rpm_b):.2f}/mi"
-            elif rpm_a < rpm_b:
-                rpm_txt = f"; RPM worsened by ${abs(rpm_a - rpm_b):.2f}/mi"
-
-        headline = f"{ent} — {core_txt} {loads_txt}{rpm_txt}."
-
-        # Driver line (variety)
-        helped = (arrow == "▲") or (arrow == "→" and _safe_float(it.get("Impact_D",0))+_safe_float(it.get("Impact_S",0)) >= 0)
-        driver_hint = it.get("driver_hint") or "Mix/volume shift."
-        verb = "helped" if helped else "hurt"
-        if sec == "lanes":
-            driver_opts = [
-                f"Biggest driver on this lane: {driver_hint} {verb} the network most.",
-                f"Top driver on this lane: {driver_hint} {verb} the network most.",
-                f"Primary driver: {driver_hint} {verb} the network most.",
-            ]
-        elif sec in ("inbound", "outbound"):
-            driver_opts = [
-                f"Biggest driver in this area: {driver_hint} {verb} the network most.",
-                f"Top driver in this area: {driver_hint} {verb} the network most.",
-                f"Primary driver: {driver_hint} {verb} the network most.",
-            ]
-        else:
-            driver_opts = [
-                f"Biggest driver within this customer: {driver_hint} {verb} the network most.",
-                f"Top driver within this customer: {driver_hint} {verb} the network most.",
-                f"Primary driver: {driver_hint} {verb} the network most.",
-            ]
-        driver_line = driver_opts[i % len(driver_opts)]
-
-        stories.append({"arrow": arrow, "headline": headline, "driver_detail": driver_line})
-        i += 1
-
-    final_word = f"From {B} to {A}, these items drove the biggest changes. Focus on ▲ items for upside, mitigate ▼."
-    return {"highlights": [], "stories": stories, "final_word": final_word}
+    return {
+        "highlights": data.get("highlights", []),
+        "stories": data["stories"],
+        "final_word": data.get("final_word", ""),
+    }
 
 
 def _fmt_internal_number(value: Any) -> str:
@@ -703,7 +832,7 @@ def build_docs(
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Turn summary JSON into client & internal JSONs.")
     ap.add_argument("--summary", required=True, help="Path to summary JSON (or name in ./work).")
-    default_model = os.environ.get("MMQB_DEFAULT_MODEL", "gpt-4o-mini")
+    default_model = os.environ.get("MMQB_DEFAULT_MODEL", "gpt-4.1")
     ap.add_argument(
         "--model",
         default=default_model,

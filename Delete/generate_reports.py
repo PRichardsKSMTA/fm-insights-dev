@@ -1,6 +1,6 @@
 # generate_reports.py
 # CSV in  -> two JSONs in out/  -> optional PDFs/HTML (client + internal)
-# Model defaults to gpt-5-mini; switch with --model
+# Model defaults to gpt-4.1; switch with --model
 
 import os, io, re, json, math, argparse
 from datetime import datetime
@@ -28,8 +28,8 @@ load_dotenv(override=True)  # .env wins over machine/user env
 # ---------------------------------------------------
 INPUT_DIR = "in"
 OUTPUT_DIR = "out"
-DEFAULT_MODEL = "gpt-5-mini"     # per your spec; override with --model
-TEMPERATURE = None               # use model default; some models (e.g., gpt-5-mini) don't allow custom temperature
+DEFAULT_MODEL = "gpt-4.1"     # per your spec; override with --model
+TEMPERATURE = None               # use model default; some models (e.g., gpt-4.1) don't allow custom temperature
 
 # HTML templates for rendering PDFs (simple, readable defaults)
 CLIENT_HTML_TMPL = r"""<!doctype html>

@@ -5,3 +5,4 @@ pyodbc
 python-dotenv
 openai
 requests
+azure-storage-blob
