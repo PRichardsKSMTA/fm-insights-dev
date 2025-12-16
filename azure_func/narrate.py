@@ -72,6 +72,301 @@ LOG_CONTAINER_NAME = "fm-insights-logs"
 _BLOB_SERVICE_CLIENT: Optional["BlobServiceClient"] = None # type: ignore
 _BLOB_INIT_FAILED = False
 
+BANNED_SUBJECTIVE_WORDS = {
+    "significant", "significantly",
+    "notable", "notably",
+    "dramatic", "dramatically",
+    "surprising", "surprisingly",
+    "material", "materially",
+    "strong", "strongly",
+    "weak", "weakly",
+}
+
+def _driver_effect(arrow: Any, impact_d: Any, impact_s: Any) -> str:
+    """Map arrow + impact into 'helped' or 'hurt' per Scenario Rules v3."""
+    ch = str(arrow or "").strip()
+    try:
+        impact_total = float(impact_d or 0) + float(impact_s or 0)
+    except Exception:
+        impact_total = 0.0
+
+    if ch in ("▲", "△", "↑"):
+        return "helped"
+    if ch in ("▼", "▽", "↓"):
+        return "hurt"
+    # flat: use sign of Impact_D + Impact_S
+    return "helped" if impact_total >= 0 else "hurt"
+
+
+def _driver_detail_from_item(item: Dict[str, Any]) -> str:
+    """Construct driver_detail exactly following Scenario Rules v3 templates."""
+    section = str(item.get("section") or "").strip().lower()
+    driver_hint = str(item.get("driver_hint") or "").strip()
+    arrow = item.get("arrow")
+    effect = _driver_effect(arrow, item.get("Impact_D"), item.get("Impact_S"))
+
+    if section == "customers":
+        template = "Biggest driver within this customer: {hint} {effect} the network most."
+    elif section == "lanes":
+        template = "Biggest driver on this lane: {hint} {effect} the network most."
+    else:  # inbound / outbound / anything else treated as area
+        template = "Biggest driver in this area: {hint} {effect} the network most."
+
+    return template.format(hint=driver_hint, effect=effect)
+
+
+def _normalize_driver_details(data: Dict[str, Any], items: list[Dict[str, Any]]) -> None:
+    """
+    Override driver_detail from the LLM with the canonical template output,
+    using the original items list (1:1 with stories).
+    """
+    stories = data.get("stories") or []
+    if not isinstance(stories, list):
+        return
+
+    for idx, story in enumerate(stories):
+        if not isinstance(story, dict):
+            continue
+        if idx >= len(items):
+            break
+        story["driver_detail"] = _driver_detail_from_item(items[idx])
+        
+
+def _sanitize_subjective_language(data: Dict[str, Any]) -> None:
+    """
+    Remove banned subjective words from highlights and final_word
+    per Narrative Formatting Rules v3.
+    """
+    def _clean_text(text: str) -> str:
+        words = text.split()
+        cleaned_words = []
+        for w in words:
+            bare = re.sub(r"[^\w]", "", w).lower()
+            if bare in BANNED_SUBJECTIVE_WORDS:
+                # drop the word entirely
+                continue
+            cleaned_words.append(w)
+        return " ".join(cleaned_words)
+
+    # Clean highlights
+    hl = data.get("highlights") or []
+    if isinstance(hl, list):
+        data["highlights"] = [
+            _clean_text(str(h)) for h in hl if isinstance(h, (str,))
+        ]
+
+    # Clean final_word
+    fw = data.get("final_word")
+    if isinstance(fw, str):
+        data["final_word"] = _clean_text(fw)
+        
+        
+def _maybe_int(value: Any) -> Optional[int]:
+    """Best-effort cast to int, returning None on failure."""
+    if value in (None, ""):
+        return None
+    try:
+        return int(round(float(value)))
+    except Exception:
+        return None
+
+
+def _entity_label_from_item(item: Dict[str, Any]) -> str:
+    """
+    Build the ENTITY_LABEL per Scenario Rules v3:
+
+    customers -> "Customer: {name}"
+    lanes     -> "Lane: {name}"
+    inbound   -> "Inbound Area: {name}"
+    outbound  -> "Outbound Area: {name}"
+    """
+    section = str(item.get("section") or "").strip().lower()
+    name = str(item.get("name") or "").strip()
+
+    if section == "customers":
+        return f"Customer: {name}"
+    if section == "lanes":
+        return f"Lane: {name}"
+    if section == "inbound":
+        return f"Inbound Area: {name}"
+    if section == "outbound":
+        return f"Outbound Area: {name}"
+    return name or "Entity"
+
+
+def _core_or_clause_from_item(item: Dict[str, Any]) -> Optional[str]:
+    """
+    Construct the Core OR clause using the strict Scenario Rules v3:
+
+    - OR_A_display = round(Core_OR_A * 100, 1)
+    - OR_B_display = round(Core_OR_B * 100, 1)
+    - abs_diff_pp = abs(Core_OR_A - Core_OR_B) * 100
+
+    Verbs (closed list):
+      tightened, improved, surged, slipped, eroded, collapsed, held near
+
+    Thresholds:
+      If abs_diff_pp < 1.0:
+          "Core OR held near {OR_A_display}"
+      Else if Core_OR_A < Core_OR_B:
+          improvement_pp = (Core_OR_B - Core_OR_A) * 100
+          1.0–5.0  -> tightened
+          5.1–10.0 -> improved
+          ≥10.1    -> surged
+      Else if Core_OR_A > Core_OR_B:
+          worsening_pp = (Core_OR_A - Core_OR_B) * 100
+          1.0–5.0  -> slipped
+          5.1–10.0 -> eroded
+          ≥10.1    -> collapsed
+    """
+    a = _maybe_float(item.get("Core_OR_A"))
+    b = _maybe_float(item.get("Core_OR_B"))
+    if a is None or b is None:
+        # We can't safely compute the clause; leave headline as-is.
+        return None
+
+    or_a_display = round(a * 100.0, 1)
+    or_b_display = round(b * 100.0, 1)
+
+    abs_diff_pp = abs(a - b) * 100.0
+
+    # Near-zero movement rule
+    if abs_diff_pp < 1.0:
+        return f"Core OR held near {or_a_display:.1f}"
+
+    # Profitability improved (Core_OR_A < Core_OR_B)
+    if a < b:
+        improvement_pp = (b - a) * 100.0
+        if improvement_pp <= 5.0:
+            verb = "tightened"
+        elif improvement_pp <= 10.0:
+            verb = "improved"
+        else:
+            verb = "surged"
+    # Profitability worsened (Core_OR_A > Core_OR_B)
+    elif a > b:
+        worsening_pp = (a - b) * 100.0
+        if worsening_pp <= 5.0:
+            verb = "slipped"
+        elif worsening_pp <= 10.0:
+            verb = "eroded"
+        else:
+            verb = "collapsed"
+    else:
+        # Exact equality (should have been caught by abs_diff_pp < 1.0, but keep safe)
+        return f"Core OR held near {or_a_display:.1f}"
+
+    return f"Core OR {verb} to {or_a_display:.1f} (from {or_b_display:.1f})"
+
+
+def _loads_clause_from_item(item: Dict[str, Any]) -> Optional[str]:
+    """
+    Construct the loads clause using the exact Scenario Rules v3 load-change rules:
+
+      diff = Loads_A - Loads_B
+
+      If diff > 0:
+          'loads increased by [abs_diff]'
+      If diff < 0:
+          'loads decreased by [abs_diff]'
+      If diff = 0:
+          'loads were unchanged at [Loads_A]'
+
+    No 'held steady' or any synonyms are allowed.
+    """
+    loads_a = _maybe_int(item.get("loads_A"))
+    loads_b = _maybe_int(item.get("loads_B"))
+    if loads_a is None or loads_b is None:
+        return None
+
+    diff = loads_a - loads_b
+    if diff > 0:
+        return f"loads increased by {diff}"
+    if diff < 0:
+        return f"loads decreased by {abs(diff)}"
+    return f"loads were unchanged at {loads_a}"
+
+
+def _rpm_clause_from_item(item: Dict[str, Any]) -> str:
+    """
+    Construct the RPM clause using the strict gating rules:
+
+    RPM is allowed only when ALL are true:
+      1) rpm_is_big_factor is true
+      2) Core_OR_A_is_substituted is false
+      3) Core_OR_B_is_substituted is false
+
+    Formatting (only when allowed):
+      delta = rpm_A - rpm_B
+
+      If delta > 0:
+          '; RPM increased by $X.XX/mi'
+      If delta < 0:
+          '; RPM fell by $X.XX/mi'
+      If delta == 0:
+          no RPM clause
+    """
+    rpm_big = bool(item.get("rpm_is_big_factor"))
+    sub_a = bool(item.get("Core_OR_A_is_substituted"))
+    sub_b = bool(item.get("Core_OR_B_is_substituted"))
+
+    # Strict gating
+    if not rpm_big or sub_a or sub_b:
+        return ""
+
+    rpm_a = _maybe_float(item.get("rpm_A"))
+    rpm_b = _maybe_float(item.get("rpm_B"))
+    if rpm_a is None or rpm_b is None:
+        return ""
+
+    delta = rpm_a - rpm_b
+    if abs(delta) < 1e-9:
+        return ""
+
+    change = abs(delta)
+    if delta > 0:
+        return f"; RPM increased by ${change:.2f}/mi"
+    return f"; RPM fell by ${change:.2f}/mi"
+
+
+def _rebuild_headlines(data: Dict[str, Any], items: list[Dict[str, Any]]) -> None:
+    """
+    Override the LLM-provided 'headline' for each story and rebuild it
+    deterministically from the numeric 'items', using Scenario Rules v3.
+
+    Pattern (must match Scenario Rules v3 / Narrative Formatting v3):
+
+      [ENTITY_LABEL] - [Core OR clause] and [loads clause][; RPM clause]
+
+    We also enforce that the 'arrow' in the story matches the original item.
+    """
+    stories = data.get("stories") or []
+    if not isinstance(stories, list):
+        return
+
+    for idx, story in enumerate(stories):
+        if not isinstance(story, dict):
+            continue
+        if idx >= len(items):
+            break
+
+        item = items[idx]
+
+        core_clause = _core_or_clause_from_item(item)
+        loads_clause = _loads_clause_from_item(item)
+        if not core_clause or not loads_clause:
+            # If we can't safely compute both, leave the original headline untouched.
+            continue
+
+        rpm_clause = _rpm_clause_from_item(item)
+        entity_label = _entity_label_from_item(item)
+
+        headline = f"{entity_label} - {core_clause} and {loads_clause}{rpm_clause}"
+
+        story["headline"] = headline
+        # Ensure arrow matches the numeric item, not the LLM.
+        story["arrow"] = str(item.get("arrow") or "")
+
 
 def _safe_float(x: Any, default: float = 0.0) -> float:
     try:
@@ -356,7 +651,7 @@ def _call_chat_completion(
         "model": model,
         "messages": final_messages,
         "response_format": {"type": "json_object"},
-        "temperature": 0.2,
+        "temperature": 0.0,
     }
 
     # Log request
@@ -658,6 +953,11 @@ def build_client_payload(
 
     if "stories" not in data or not isinstance(data.get("stories"), list):
         raise RuntimeError("LLM did not return a valid 'stories' list.")
+
+    # Enforce Scenario Rules v3 for driver_detail and Narrative Formatting v3 tone
+    _normalize_driver_details(data, items)
+    _rebuild_headlines(data, items)
+    _sanitize_subjective_language(data)
 
     return {
         "highlights": data.get("highlights", []),

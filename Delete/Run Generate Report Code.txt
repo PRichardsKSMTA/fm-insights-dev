@@ -1,2 +1,0 @@
-.\.venv\Scripts\activate
-python generate_reports.py --client ADSJ --csv "ADSJ_20250830_OpenAIAPI.csv"

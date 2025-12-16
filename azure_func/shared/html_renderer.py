@@ -227,12 +227,28 @@ def _render_client_with_template(doc: Dict[str, Any], template: str) -> str:
     stories = [s for s in doc.get("stories", []) if isinstance(s, dict)]
 
     def _split_headline(raw: str) -> Tuple[str, str]:
-        """Split 'Entity — rest' into (entity, rest)."""
+        """
+        Split '[ENTITY_LABEL] - rest' into (ENTITY_LABEL, rest).
+
+        The LLM headline is required by Scenario RulesV3 / Narrative FormattingV3
+        to use ' - ' between entity and the Core OR clause.
+        """
         text = raw.strip()
+
+        # Look for " - " first (per the rules)
+        parts = text.split(" - ", 1)
+        if len(parts) == 2:
+            return parts[0].strip(), parts[1].strip()
+
+        # Fallback: if an em dash is present for some reason, support it too
         parts = text.split(" — ", 1)
         if len(parts) == 2:
             return parts[0].strip(), parts[1].strip()
-        return text, text
+
+        # If we can't find a separator, treat the whole thing as the entity label
+        # and leave the body empty so we don't duplicate text.
+        return text, ""
+
 
     def _arrow_word(ch: str) -> str:
         ch = (ch or "").strip()
