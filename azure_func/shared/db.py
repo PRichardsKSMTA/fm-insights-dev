@@ -92,11 +92,11 @@ class DatabaseClient:
     def introspect_procedure(self, proc_name: str) -> None:
         """Log the canonical schema, object_id, and parameters of a procedure."""
         try:
-            # Accept inputs like "DEV.MyProc" or "MyProc"
+            # Accept inputs like "dbo.MyProc" or "MyProc"
             if "." in proc_name:
                 schema_name, object_name = proc_name.split(".", 1)
             else:
-                schema_name, object_name = "DEV", proc_name
+                schema_name, object_name = "dbo", proc_name
 
             sql = """
                 SELECT

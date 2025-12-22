@@ -329,16 +329,145 @@ def _rpm_clause_from_item(item: Dict[str, Any]) -> str:
     return f"; RPM fell by ${change:.2f}/mi"
 
 
+def _scenario_headline_body(item: Dict[str, Any]) -> Tuple[Optional[str], Optional[int]]:
+    """
+    Build the scenario-specific headline body (everything after the entity label and dash)
+    using Section 9 of Scenario Rules v3.
+
+    Returns (text, scenario_id) where scenario_id is 1–8 when a scenario matched,
+    or (None, None) if we could not safely apply scenario logic.
+    """
+    arrow = item.get("arrow")
+    effect_word = _driver_effect(arrow, item.get("Impact_D"), item.get("Impact_S"))
+
+    loads_a = _maybe_int(item.get("loads_A"))
+    loads_b = _maybe_int(item.get("loads_B"))
+    zero_a = bool(item.get("zero_A"))
+    zero_b = bool(item.get("zero_B"))
+    sub_a = bool(item.get("Core_OR_A_is_substituted"))
+    sub_b = bool(item.get("Core_OR_B_is_substituted"))
+
+    comp = _maybe_float(item.get("Composite"))
+    core_a = _maybe_float(item.get("Core_OR_A"))
+    core_b = _maybe_float(item.get("Core_OR_B"))
+
+    def _or_display(val: Optional[float]) -> str:
+        if val is None:
+            return ""
+        return f"{val * 100.0:.1f}"
+
+    # ------------------------------------------------------------
+    # 1–4: zero-load / substitution scenarios
+    # ------------------------------------------------------------
+
+    # 1. IF zero_A = True
+    if zero_a:
+        or_b = _or_display(core_b)
+        return (
+            f"No volume this week and by losing this freight at {or_b}, "
+            f"this {effect_word} network profit.",
+            1,
+        )
+
+    # 2. IF zero_B = True
+    if zero_b:
+        or_a = _or_display(core_a)
+        loads_a_int = loads_a if loads_a is not None else 0
+        return (
+            f"No volume in the prior week and by adding {loads_a_int} loads at {or_a}, "
+            f"this {effect_word} network profit.",
+            2,
+        )
+
+    # 3. IF Core_OR_A_is_sub = True
+    if sub_a:
+        or_b = _or_display(core_b)
+        diff = (loads_b or 0) - (loads_a or 0)
+        abs_diff = abs(diff)
+        return (
+            f"Volume was marginal this week and the loss of {abs_diff} loads at {or_b} "
+            f"{effect_word} network profit.",
+            3,
+        )
+
+    # 4. IF Core_OR_B_is_sub = True
+    if sub_b:
+        or_a = _or_display(core_a)
+        diff = (loads_a or 0) - (loads_b or 0)
+        abs_diff = abs(diff)
+        return (
+            f"Volume was marginal in the prior week and by increasing {abs_diff} loads at {or_a}, "
+            f"this {effect_word} network profit.",
+            4,
+        )
+
+    # If we don't have Composite or Core OR values, we can't apply scenarios 5–8
+    if comp is None or core_a is None or core_b is None:
+        return None, None
+
+    core_clause = _core_or_clause_from_item(item)
+    loads_clause = _loads_clause_from_item(item)
+    if not core_clause or not loads_clause:
+        return None, None
+
+    # ------------------------------------------------------------
+    # 5–8: Composite + Core OR alignment scenarios
+    # ------------------------------------------------------------
+
+    # 5. IF Composite > 0 and CORE_OR_A < CORE_OR_B
+    if comp > 0 and core_a < core_b:
+        return (
+            f"{core_clause} and {loads_clause}. This improved profitability.",
+            5,
+        )
+
+    # 6. IF Composite < 0 and CORE_OR_A > CORE_OR_B
+    if comp < 0 and core_a > core_b:
+        return (
+            f"{core_clause} and {loads_clause}. This reduced profitability.",
+            6,
+        )
+
+    # 7. IF Composite < 0 and CORE_OR_A < CORE_OR_B
+    # Transform "loads increased/decreased..." → "increased/decreased..."
+    # and "loads were unchanged..." → "was unchanged..."
+    if comp < 0 and core_a < core_b:
+        volume_clause = loads_clause
+        if loads_clause.startswith("loads "):
+            tail = loads_clause[6:]  # strip "loads "
+            if tail.startswith("were "):
+                # "loads were unchanged at X" -> "was unchanged at X"
+                volume_clause = "was " + tail[5:]
+            else:
+                # "loads increased/decreased by N" -> "increased/decreased by N"
+                volume_clause = tail
+        return (
+            f"Volume {volume_clause} which hurt the network, even though {core_clause}.",
+            7,
+        )
+
+    # 8. IF Composite > 0 and CORE_OR_A > CORE_OR_B
+    if comp > 0 and core_a > core_b:
+        return (
+            f"{core_clause}; however, because {loads_clause} this improved the network.",
+            8,
+        )
+
+    return None, None
+
+
 def _rebuild_headlines(data: Dict[str, Any], items: list[Dict[str, Any]]) -> None:
     """
     Override the LLM-provided 'headline' for each story and rebuild it
     deterministically from the numeric 'items', using Scenario Rules v3.
 
-    Pattern (must match Scenario Rules v3 / Narrative Formatting v3):
+    Headline pattern (outer shell):
 
-      [ENTITY_LABEL] - [Core OR clause] and [loads clause][; RPM clause]
+      [ENTITY_LABEL] - [Scenario body]
 
-    We also enforce that the 'arrow' in the story matches the original item.
+    where the scenario body is chosen strictly from Section 9. If we cannot
+    safely select a scenario, we fall back to the standard
+    "[Core OR clause] and [loads clause][; RPM clause]" pattern.
     """
     stories = data.get("stories") or []
     if not isinstance(stories, list):
@@ -352,16 +481,31 @@ def _rebuild_headlines(data: Dict[str, Any], items: list[Dict[str, Any]]) -> Non
 
         item = items[idx]
 
-        core_clause = _core_or_clause_from_item(item)
-        loads_clause = _loads_clause_from_item(item)
-        if not core_clause or not loads_clause:
-            # If we can't safely compute both, leave the original headline untouched.
-            continue
+        body, scenario_id = _scenario_headline_body(item)
 
-        rpm_clause = _rpm_clause_from_item(item)
+        if body is None:
+            # Fallback to the strict Core OR + loads + optional RPM pattern
+            core_clause = _core_or_clause_from_item(item)
+            loads_clause = _loads_clause_from_item(item)
+            if not core_clause or not loads_clause:
+                # Leave the original headline untouched if we can't compute both.
+                continue
+            rpm_clause = _rpm_clause_from_item(item)
+            body = f"{core_clause} and {loads_clause}{rpm_clause}"
+        else:
+            # For scenarios 5–8, we may still append an RPM clause if allowed.
+            # Scenarios 1–4 are zero/substitution cases → RPM is already forbidden
+            # by the RPM gating + substitution rules. :contentReference[oaicite:15]{index=15}
+            if scenario_id in (5, 6, 7, 8):
+                rpm_clause = _rpm_clause_from_item(item)
+                if rpm_clause:
+                    if body.endswith("."):
+                        body = body[:-1] + rpm_clause + "."
+                    else:
+                        body = body + rpm_clause
+
         entity_label = _entity_label_from_item(item)
-
-        headline = f"{entity_label} - {core_clause} and {loads_clause}{rpm_clause}"
+        headline = f"{entity_label} - {body}"
 
         story["headline"] = headline
         # Ensure arrow matches the numeric item, not the LLM.

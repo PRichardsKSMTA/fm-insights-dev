@@ -41,11 +41,14 @@ PROC_SAVE = "save"
 CSV_CANDIDATES = ["csv_payload", "CsvPayload", "csv", "Csv", "csv_text", "CsvText", "payload"]
 CLIENT_VIEW_SUFFIX_RE = re.compile(r"\s*[—-]\s*Client View\s*$")
 
+
 class StoredProcedureUnavailableError(RuntimeError):
     """Raised when a required stored procedure cannot be executed."""
+
     def __init__(self, proc_name: str, message: str | None = None) -> None:
         super().__init__(message or f"Stored procedure unavailable: {proc_name}")
         self.proc_name = proc_name
+
 
 def _ensure_json_response(payload: Dict[str, Any], status: int) -> func.HttpResponse:
     return func.HttpResponse(body=json.dumps(payload), status_code=status, mimetype="application/json")
@@ -61,6 +64,7 @@ def _sanitize_client_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
         sanitized["title"] = sanitized_title or title
     return sanitized
 
+
 def _extract_csv_payload(row: Dict[str, Any]) -> Optional[bytes]:
     for key in CSV_CANDIDATES:
         if key not in row:
@@ -75,12 +79,14 @@ def _extract_csv_payload(row: Dict[str, Any]) -> Optional[bytes]:
             return text.encode("utf-8")
     return None
 
+
 def _stringify(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, datetime):
         return value.isoformat()
     return str(value)
+
 
 def _rows_to_csv_bytes(rows: List[Dict[str, Any]]) -> bytes:
     if not rows:
@@ -99,6 +105,7 @@ def _rows_to_csv_bytes(rows: List[Dict[str, Any]]) -> bytes:
         writer.writerow({col: _stringify(row.get(col)) for col in columns})
     return buffer.getvalue().encode("utf-8")
 
+
 def _decode_csv_rows(csv_bytes: bytes) -> Tuple[List[Dict[str, Any]], List[str]]:
     text = csv_bytes.decode("utf-8")
     buffer = io.StringIO(text)
@@ -106,6 +113,7 @@ def _decode_csv_rows(csv_bytes: bytes) -> Tuple[List[Dict[str, Any]], List[str]]
     rows = [dict(row) for row in reader]
     columns = list(reader.fieldnames or [])
     return rows, columns
+
 
 def _load_dataset(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[str]]:
     LOGGER.info("Normalizing dataset rows", extra={"event": "load_dataset_start", "rows_in": len(rows)})
@@ -132,10 +140,12 @@ def _load_dataset(rows: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Lis
     )
     return normalized, columns
 
+
 def _resolve_model() -> str:
     model = os.environ.get(DEFAULT_MODEL_ENV, "gpt-4.1")
     LOGGER.info("Model resolved", extra={"event": "model_resolved", "model": model})
     return model
+
 
 def _update_summary_meta(
     summary: Dict[str, Any],
@@ -167,12 +177,14 @@ def _update_summary_meta(
     LOGGER.info("Summary meta updated", extra={"event": "summary_meta", "operation_cd": operation_cd, "upload_id": upload_id})
     return summary
 
+
 def _call_procedure(db: DatabaseClient, proc_name: str, params: Sequence[Any] | None = None) -> List[Dict[str, Any]]:
     try:
         return db.call_procedure(proc_name, params)
     except DatabaseError as exc:  # pragma: no cover - requires live DB
         LOGGER.error("Stored procedure unavailable", extra={"event": "missing_proc", "proc": proc_name})
         raise StoredProcedureUnavailableError(proc_name, str(exc)) from exc
+
 
 def _call_procedure_no_results(db: DatabaseClient, proc_name: str, params: Sequence[Any] | None = None) -> None:
     try:
@@ -181,11 +193,13 @@ def _call_procedure_no_results(db: DatabaseClient, proc_name: str, params: Seque
         LOGGER.error("Stored procedure unavailable", extra={"event": "missing_proc", "proc": proc_name})
         raise StoredProcedureUnavailableError(proc_name, str(exc)) from exc
 
+
 def _normalize_operation_cd(data: Dict[str, Any]) -> str:
     operation = str(data.get("OPERATION_CD") or data.get("operation_cd") or data.get("operation") or "").strip()
     if not operation:
         raise ValidationError("'OPERATION_CD' is required.")
     return operation
+
 
 def _normalize_upload_id(data: Dict[str, Any]) -> str:
     upload = str(data.get("UPLOAD_ID") or data.get("upload_id") or data.get("upload") or "").strip()
@@ -200,6 +214,37 @@ def _normalize_upload_id(data: Dict[str, Any]) -> str:
     except ValueError as exc:
         raise ValidationError("'UPLOAD_ID' must start with a valid YYYYMMDD date.") from exc
     return upload
+
+
+def _normalize_week_ct(data: Dict[str, Any]) -> Optional[int]:
+    """
+    Normalize optional WEEK_CT:
+
+    - Accepts WEEK_CT / week_ct / Weeks / weeks
+    - Must be a positive integer if provided
+    - Returns None when omitted so we can keep current behavior
+      (proc called with only OPERATION_CD).
+    """
+    raw = (
+        data.get("WEEK_CT")
+        or data.get("week_ct")
+        or data.get("Weeks")
+        or data.get("weeks")
+    )
+
+    if raw is None or raw == "":
+        return None
+
+    try:
+        week_ct = int(raw)
+    except (TypeError, ValueError):
+        raise ValidationError("'WEEK_CT' must be an integer if provided.")
+
+    if week_ct <= 0:
+        raise ValidationError("'WEEK_CT' must be a positive integer if provided.")
+
+    return week_ct
+
 
 def _fetch_dataset(
     db: DatabaseClient,
@@ -407,11 +452,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         operation_cd = _normalize_operation_cd(data)
         upload_id = _normalize_upload_id(data)
+        week_ct = _normalize_week_ct(data)
     except ValidationError as exc:
         LOGGER.warning("Invalid request payload", extra={"event": "request_invalid", "error": str(exc)})
         return _ensure_json_response({"error": str(exc)}, 400)
 
-    log_context = {"operation_cd": operation_cd, "upload_id": upload_id}
+    log_context = {"operation_cd": operation_cd, "upload_id": upload_id, "week_ct": week_ct}
     LOGGER.info("Request received", extra={"event": "request_received", **log_context})
 
     try:
@@ -437,16 +483,22 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     except DatabaseError as exc:
         log_exception(LOGGER, "Failed to initialize database client", extra=log_context)
         return _ensure_json_response({"error": str(exc)}, 500)
-    
+
     try:
         db.introspect_procedure(procs[PROC_DATA_CURRENT])
     except Exception:
         pass
 
     try:
-        # 1) Load single dataset (proc expects OPERATION_CD only)
+        # 1) Load single dataset (proc expects OPERATION_CD, and optionally WEEK_CT)
         data_proc = procs[PROC_DATA_CURRENT]
-        current_rows, columns = _fetch_dataset(db, data_proc, [operation_cd])
+
+        if week_ct is None:
+            data_params: List[Any] = [operation_cd]
+        else:
+            data_params = [operation_cd, week_ct]
+
+        current_rows, columns = _fetch_dataset(db, data_proc, data_params)
         if not current_rows:
             LOGGER.warning("No dataset rows returned from proc", extra={"event": "no_data_from_proc", **log_context})
             # _complete_operation_without_data(
@@ -458,7 +510,13 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             return _ensure_json_response({"error": "No data available for supplied upload."}, 404)
         LOGGER.info(
             "Dataset loaded",
-            extra={"event": "dataset_loaded", "current_rows": len(current_rows), "column_count": len(columns), "columns_sample": columns[:50], **log_context},
+            extra={
+                "event": "dataset_loaded",
+                "current_rows": len(current_rows),
+                "column_count": len(columns),
+                "columns_sample": columns[:50],
+                **log_context,
+            },
         )
 
         # 2) Get prompt text and html template (optional but logged)
@@ -486,7 +544,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 **log_context,
             },
         )
-        
+
         # 5) Save
         internal_json = json.dumps(internal_doc)
         client_json = json.dumps(client_doc)

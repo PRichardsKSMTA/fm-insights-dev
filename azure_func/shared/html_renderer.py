@@ -181,9 +181,9 @@ def _render_client_with_template(doc: Dict[str, Any], template: str) -> str:
     """
     Render a client-facing document using an HTML skeleton pulled from the DB.
 
-    The template supports simple Mustache-style placeholders:
+    Supported placeholders:
 
-      Global (single value):
+      Global:
         {{CLIENT_CODE}}
         {{TITLE}}
         {{LABEL_A}}
@@ -192,21 +192,21 @@ def _render_client_with_template(doc: Dict[str, Any], template: str) -> str:
         {{LOW_VOLUME_NOTE}}
         {{FINAL_WORD}}
 
-      Repeating sections:
+      Sections:
         {{#HIGHLIGHTS}}...{{/HIGHLIGHTS}}
-          Inside the block: {{HIGHLIGHT}}
+          {{HIGHLIGHT}}
 
         {{#STORIES}}...{{/STORIES}}
-          Inside the block:
-            {{INDEX}}          1..10
-            {{ARROW}}          e.g. ▲, ▼, →
-            {{ARROW_WORD}}     "up" | "down" | "flat"
-            {{ENTITY_LABEL}}   "Inbound Area: IN-IND"
-            {{HEADLINE}}       headline text without entity label
-            {{HEADLINE_FULL}}  full headline text
-            {{DRIVER_DETAIL}}  driver detail line
+          {{INDEX}}
+          {{ARROW}}
+          {{ARROW_WORD}}
+          {{{ARROW_HTML}}}   (unescaped; safe controlled HTML entities)
+          {{ENTITY_LABEL}}
+          {{HEADLINE}}
+          {{HEADLINE_FULL}}
+          {{DRIVER_DETAIL}}
 
-    Everything substituted is HTML-escaped.
+    By default values are HTML-escaped. Only triple-brace tokens are inserted raw.
     """
 
     meta = doc.get("meta", {}) or {}
@@ -227,39 +227,38 @@ def _render_client_with_template(doc: Dict[str, Any], template: str) -> str:
     stories = [s for s in doc.get("stories", []) if isinstance(s, dict)]
 
     def _split_headline(raw: str) -> Tuple[str, str]:
-        """
-        Split '[ENTITY_LABEL] - rest' into (ENTITY_LABEL, rest).
-
-        The LLM headline is required by Scenario RulesV3 / Narrative FormattingV3
-        to use ' - ' between entity and the Core OR clause.
-        """
         text = raw.strip()
 
-        # Look for " - " first (per the rules)
         parts = text.split(" - ", 1)
         if len(parts) == 2:
             return parts[0].strip(), parts[1].strip()
 
-        # Fallback: if an em dash is present for some reason, support it too
         parts = text.split(" — ", 1)
         if len(parts) == 2:
             return parts[0].strip(), parts[1].strip()
 
-        # If we can't find a separator, treat the whole thing as the entity label
-        # and leave the body empty so we don't duplicate text.
         return text, ""
 
-
     def _arrow_word(ch: str) -> str:
-        ch = (ch or "").strip()
+        ch = (ch or "").strip().lower()
+        if ch in ("up", "down", "flat"):
+            return ch
         if ch in ("▲", "△", "↑"):
             return "up"
         if ch in ("▼", "▽", "↓"):
             return "down"
         return "flat"
 
+    def _arrow_html(word: str) -> str:
+        # HTML numeric entities (NO backslashes) + non-breaking spaces for spacing
+        if word == "up":
+            return "&#9650;&nbsp;&nbsp;"   # ▲
+        if word == "down":
+            return "&#9660;&nbsp;&nbsp;"   # ▼
+        return "&#8594;&nbsp;&nbsp;"       # →
+
     def _render_section(section: str, items: List[Dict[str, str]], text: str) -> str:
-        """Very small Mustache-like repeater for {{#SECTION}}...{{/SECTION}}."""
+        """Very small Mustache-like repeater for {{#SECTION}}...{{/SECTION}} with triple-brace support."""
         start_tag = "{{#" + section + "}}"
         end_tag = "{{/" + section + "}}"
         start = text.find(start_tag)
@@ -271,32 +270,44 @@ def _render_client_with_template(doc: Dict[str, Any], template: str) -> str:
         block = text[start + len(start_tag) : end]
         after = text[end + len(end_tag) :]
 
+        triple_keys = sorted(set(re.findall(r"{{{(\w+)}}}", block)))
+
         rendered_blocks: List[str] = []
         for item in items:
             block_text = block
+
+            # Triple braces: insert RAW (unescaped) values
+            for key in triple_keys:
+                block_text = block_text.replace("{{{" + key + "}}}", str(item.get(key, "")))
+
+            # Double braces: insert already-escaped values
             for key, value in item.items():
                 block_text = block_text.replace("{{" + key + "}}", value)
+
             rendered_blocks.append(block_text)
 
         return before + "".join(rendered_blocks) + after
 
-    # Build items for HIGHLIGHTS
-    highlight_items: List[Dict[str, str]] = [
-        {"HIGHLIGHT": escape(h)} for h in highlights
-    ]
+    # Build items for HIGHLIGHTS (escaped)
+    highlight_items: List[Dict[str, str]] = [{"HIGHLIGHT": escape(h)} for h in highlights]
 
-    # Build items for STORIES
+    # Build items for STORIES (escaped except ARROW_HTML)
     story_items: List[Dict[str, str]] = []
     for index, story in enumerate(stories, 1):
         raw_headline = str(story.get("headline", "")).strip()
         entity_label, headline_body = _split_headline(raw_headline)
+
         arrow = str(story.get("arrow", "")).strip()
         driver_detail = str(story.get("driver_detail", "")).strip()
+
+        word = _arrow_word(arrow)
+
         story_items.append(
             {
                 "INDEX": str(index),
                 "ARROW": escape(arrow),
-                "ARROW_WORD": escape(_arrow_word(arrow)),
+                "ARROW_WORD": escape(word),
+                "ARROW_HTML": _arrow_html(word),  # raw insertion via {{{ARROW_HTML}}}
                 "ENTITY_LABEL": escape(entity_label),
                 "HEADLINE": escape(headline_body),
                 "HEADLINE_FULL": escape(raw_headline),
@@ -309,9 +320,8 @@ def _render_client_with_template(doc: Dict[str, Any], template: str) -> str:
     rendered = _render_section("STORIES", story_items, rendered)
     rendered = _render_section("HIGHLIGHTS", highlight_items, rendered)
 
-    # Single-value placeholders
+    # Single-value placeholders (escaped)
     final_word = escape(str(doc.get("final_word", "")).strip())
-
     replacements = {
         "CLIENT_CODE": escape(client_code),
         "TITLE": escape(title),
@@ -354,6 +364,7 @@ def _render_client(doc: Dict[str, Any]) -> str:
             parts.append(f"<li>{escape(highlight)}</li>")
         parts.append("</ul></div>")
 
+    # ---- THIS IS THE IMPORTANT PART: TOP 10 STORIES WITH ARROW PREFIX ----
     stories = [s for s in doc.get("stories", []) if isinstance(s, dict)]
     if stories:
         parts.append("<h2>Top 10 Stories</h2>")
@@ -361,10 +372,13 @@ def _render_client(doc: Dict[str, Any]) -> str:
             arrow = str(story.get("arrow", "")).strip()
             headline = str(story.get("headline", "")).strip()
             driver = str(story.get("driver_detail", "")).strip()
+
+            # If the headline already starts with an arrow symbol, don't double-prefix
             if re.match(r"^[\u25B2\u25BC\u2192▲▼→]\s", headline):
                 prefix = ""
             else:
                 prefix = f"{escape(arrow)} " if arrow else ""
+
             parts.append(
                 "<div class='story'><b>"
                 f"{index}. {prefix}{escape(headline)}</b>"
